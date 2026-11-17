@@ -1,0 +1,22 @@
+name: Docs
+description: A README, docs page or source comment is wrong, unclear or missing.
+labels: ['documentation', 'area: docs']
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page or file
+      description: A README section, a docs site page, or a source file whose comment is off.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong or missing
+      description: A sample that does not run as written is a docs bug too.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested wording (optional)

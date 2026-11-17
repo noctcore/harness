@@ -1,0 +1,55 @@
+name: Feature request
+description: Suggest a change to the runner, the lint-meta engine, the CLI or the API.
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The package stays small on purpose: plain Node, zero runtime dependencies, no network call, every dependency injected. A clear problem statement helps more than a detailed design. A new rule or pinned tool has its own form.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues.
+          required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where it belongs
+      options:
+        - 'harness check (manifest and runner)'
+        - 'harness lint-meta or catalog'
+        - '@noctcore/harness/pinned-tools'
+        - A new package
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the situation in your repo or CI, not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like the package to do?
+      description: The flag, option or API you have in mind, if any.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you like to implement it?
+      description: A pull request is welcome once this issue agrees on the change.
+      options:
+        - 'No, I am only suggesting it'
+        - 'Yes, once we agree on the approach'
+    validations:
+      required: true

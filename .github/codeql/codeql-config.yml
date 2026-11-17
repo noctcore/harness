@@ -1,0 +1,10 @@
+# What CodeQL reads: the package, its tests and the repo scripts. Build output,
+# installed dependencies, the test fixtures and the docs site's own bundle are
+# not ours to fix, and findings in them would bury the ones that are.
+name: noctcore-harness
+paths-ignore:
+  - '**/dist/**'
+  - '**/node_modules/**'
+  - 'packages/*/fixtures/**'
+  - 'site/dist/**'
+  - 'site/.astro/**'

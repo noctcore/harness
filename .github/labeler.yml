@@ -1,0 +1,67 @@
+# Path based labels for pull requests, applied by .github/workflows/labeler.yml.
+# Names match the repo labels (gh label list); the labeler never creates one.
+
+'pkg: harness':
+  - changed-files:
+      - any-glob-to-any-file: ['packages/harness/**']
+
+'pkg: harness-mutation':
+  - changed-files:
+      - any-glob-to-any-file: ['packages/harness-mutation/**']
+
+# harness check: the manifest loader, the runner and the CLI around them.
+'area: runner':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/harness/src/manifest*.ts'
+          - 'packages/harness/src/run*.ts'
+          - 'packages/harness/src/cli*.ts'
+          - 'packages/harness/src/index.ts'
+
+# harness lint-meta and catalog: the rule contract, registry, run loop, baselines.
+'area: lint-meta':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/harness/src/lint-meta/**'
+          - 'packages/harness/src/lint-meta.test.ts'
+          - 'packages/harness/src/catalog.test.ts'
+
+# The @noctcore/harness/rules subpath.
+'area: rules':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/harness/src/rules/**'
+          - 'packages/harness/src/rules*.ts'
+
+# The @noctcore/harness/pinned-tools subpath.
+'area: pinned-tools':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/harness/src/pinned-tools/**'
+          - 'packages/harness/src/pinned-tools*.ts'
+
+'area: testing':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/*/src/**/*.test.ts'
+          - 'packages/*/fixtures/**'
+          - 'packages/*/bunfig.toml'
+
+'area: docs':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'site/**'
+          # Not **/*.md: every changeset in .changeset/ is Markdown too.
+          - '*.md'
+          - 'packages/*/README.md'
+          - 'assets/brand/**'
+          - '.github/workflows/docs.yml'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - 'scripts/**'
+          - '.husky/**'
+          - 'eslint.config.js'
+          - 'commitlint.config.js'
