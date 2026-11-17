@@ -111,6 +111,14 @@ describe('the Docker probes, through a CLI that does not exist', () => {
     expect(deps.imagePresent('example.invalid/tool:1.0.0')).toBe(false);
     expect(deps.pull('example.invalid/tool:1.0.0')).toBe(false);
   });
+
+  test('thread the one command into both the run deps and the gitleaks deps', () => {
+    expect(nodeRunDeps({ docker: MISSING }).dockerCommand).toBe(MISSING);
+    expect(nodeRunDeps().dockerCommand).toBe('docker');
+    const gitleaks = nodeGitleaksDeps('.', { docker: MISSING });
+    expect(gitleaks.dockerCommand).toBe(MISSING);
+    expect(gitleaks.dockerAvailable()).toBe(false);
+  });
 });
 
 describe('nodeFetchDeps on a real archive', () => {

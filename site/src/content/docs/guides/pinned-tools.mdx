@@ -75,8 +75,10 @@ things:
 
 ### Another container CLI
 
-`nodeRunDeps({ docker: 'podman' })` names the CLI that the probes call: the daemon check, the image
-lookup and the pull. The default is `docker`.
+`nodeRunDeps({ docker: 'podman' })` names the CLI that every container call uses: the daemon check,
+the image lookup, the pull and the run itself. `nodeGitleaksDeps(root, { docker: 'podman' })` takes
+the same option, so the gitleaks scan runs through it too. The default is `docker`. A repo that
+builds its own deps sets `dockerCommand` on them to the same effect.
 
 ## The default pins
 

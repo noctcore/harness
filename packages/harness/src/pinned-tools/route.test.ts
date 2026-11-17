@@ -217,6 +217,12 @@ describe('runLinter', () => {
     expect(run.calls[1] ?? '').toMatch(/^docker run --rm/u);
   });
 
+  test('runs the image through the configured container CLI', () => {
+    const run = deps({ dockerCommand: 'podman' });
+    expect(runLinter(ZIZMOR, ROOT, run).status).toBe('passed');
+    expect(run.calls.at(-1) ?? '').toMatch(/^podman run --rm/u);
+  });
+
   test('is blocked when the image cannot be pulled, and runs nothing', () => {
     const run = deps({ imagePresent: () => false, pull: () => false });
     expect(runLinter(ZIZMOR, ROOT, run).status).toBe('blocked');
