@@ -1,0 +1,6 @@
+[test]
+# `bun run test:coverage` fails when any source file is below these floors.
+coverageThreshold = { lines = 0.87, functions = 0.83 }
+coverageSkipTestFiles = true
+# Test-only helpers, never bundled.
+coveragePathIgnorePatterns = ["src/lint-meta/create-fake-ctx.ts", "src/rules/test-support.ts"]
