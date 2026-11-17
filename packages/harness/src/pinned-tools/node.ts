@@ -23,10 +23,9 @@ import type { IFetchDeps } from './fetch.js';
 import type { IGitleaksRunDeps } from './gitleaks.js';
 import { placeBinary } from './place-binary.js';
 import type { IRunDeps } from './route.js';
-import { parseVersion } from './route.js';
+import { DOCKER_COMMAND, parseVersion } from './route.js';
 
-/** The container CLI the image route runs, unless the caller names another. */
-export const DOCKER_COMMAND = 'docker';
+export { DOCKER_COMMAND };
 
 /** Whether a Docker daemon answers through `docker` (or the named CLI). */
 export function dockerAvailable(docker: string = DOCKER_COMMAND): boolean {
@@ -58,7 +57,7 @@ function reportedVersion(command: string, args: readonly string[]): string | nul
 }
 
 export interface INodeRunOptions {
-  /** The container CLI the probes call. Defaults to `docker`. */
+  /** The container CLI every call uses: the probes, the pull and the run. Defaults to `docker`. */
   readonly docker?: string;
 }
 
@@ -69,6 +68,7 @@ export function nodeRunDeps(options: INodeRunOptions = {}): IRunDeps {
     workflows: workflowFilesUnder,
     nativeVersion: (tool) => reportedVersion(tool.name, tool.versionArgs),
     dockerAvailable: () => dockerAvailable(docker),
+    dockerCommand: docker,
     imagePresent: (image) => {
       const result = spawnSync(docker, ['image', 'inspect', image], { encoding: 'utf8' });
       return result.error === undefined && result.status === 0;
@@ -81,11 +81,13 @@ export function nodeRunDeps(options: INodeRunOptions = {}): IRunDeps {
   };
 }
 
-/** `runGitleaks`'s deps for the checkout at `root`. */
-export function nodeGitleaksDeps(root: string): IGitleaksRunDeps {
+/** `runGitleaks`'s deps for the checkout at `root`, calling the same container CLI as `nodeRunDeps`. */
+export function nodeGitleaksDeps(root: string, options: INodeRunOptions = {}): IGitleaksRunDeps {
+  const docker = options.docker ?? DOCKER_COMMAND;
   return {
     nativeVersion: () => reportedVersion('gitleaks', ['version']),
-    dockerAvailable,
+    dockerAvailable: () => dockerAvailable(docker),
+    dockerCommand: docker,
     gitDirIsLocal: () => {
       try {
         return statSync(join(root, '.git')).isDirectory();

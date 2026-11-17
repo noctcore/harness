@@ -157,4 +157,10 @@ describe('runGitleaks', () => {
     expect(runGitleaks(VERSION, ROOT, image.deps).status).toBe('failed');
     expect(image.spawned).toEqual(['docker']);
   });
+
+  test('scans through the configured container CLI on the image route', () => {
+    const { deps: run, spawned } = runDeps({ dockerCommand: 'podman' });
+    expect(runGitleaks(VERSION, ROOT, run).status).toBe('passed');
+    expect(spawned).toEqual(['podman']);
+  });
 });

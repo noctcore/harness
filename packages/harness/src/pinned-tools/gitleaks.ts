@@ -12,7 +12,7 @@
  */
 import { GITLEAKS_IMAGE } from './pins.js';
 import type { LinterRoute, LinterStatus } from './route.js';
-import { linterVerdict } from './route.js';
+import { DOCKER_COMMAND, linterVerdict } from './route.js';
 
 /** The env variable a workflow pins gitleaks with, unless the caller names another. */
 export const GITLEAKS_VERSION_VARIABLE = 'GITLEAKS_VERSION';
@@ -48,6 +48,8 @@ export interface IGitleaksDeps {
   /** The version a native gitleaks reports (`gitleaks version`), or null when there is none. */
   readonly nativeVersion: () => string | null;
   readonly dockerAvailable: () => boolean;
+  /** The container CLI the image run spawns. Defaults to `docker`. */
+  readonly dockerCommand?: string;
   /** Whether `<root>/.git` is a directory, not a worktree's pointer file. */
   readonly gitDirIsLocal: () => boolean;
 }
@@ -128,7 +130,7 @@ export function runGitleaks(
 ): IGitleaksResult {
   const route = chooseGitleaksRoute(version, root, deps, options);
   if (route.kind === 'blocked') return { route, status: 'blocked', reason: route.reason };
-  const command = route.kind === 'native' ? route.command : 'docker';
+  const command = route.kind === 'native' ? route.command : (deps.dockerCommand ?? DOCKER_COMMAND);
   const code = deps.spawn(command, route.args, root);
   if (code === null) {
     return { route, status: 'blocked', reason: `${command} could not be started` };

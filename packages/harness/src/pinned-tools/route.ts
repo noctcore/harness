@@ -23,12 +23,17 @@ export type LinterRoute =
   | { readonly kind: 'docker'; readonly image: string; readonly args: readonly string[] }
   | { readonly kind: 'blocked'; readonly reason: string };
 
+/** The container CLI the image route runs, unless the deps name another. */
+export const DOCKER_COMMAND = 'docker';
+
 export type LinterStatus = 'passed' | 'failed' | 'blocked';
 
 export interface IRouteDeps {
   /** The version a native tool on PATH reports, or null when there is none. */
   readonly nativeVersion: (tool: IToolPin) => string | null;
   readonly dockerAvailable: () => boolean;
+  /** The container CLI the image run spawns. Defaults to `docker`. */
+  readonly dockerCommand?: string;
 }
 
 /**
@@ -170,7 +175,7 @@ export function runLinter(pin: ILinterPin, root: string, deps: IRunDeps): ILinte
       reason: `could not pull the pinned image ${route.image} (no network or registry)`,
     };
   }
-  const command = route.kind === 'native' ? route.command : 'docker';
+  const command = route.kind === 'native' ? route.command : (deps.dockerCommand ?? DOCKER_COMMAND);
   const code = deps.spawn(command, route.args, root);
   if (code === null) {
     return { route, status: 'blocked', reason: `${command} could not be started` };
