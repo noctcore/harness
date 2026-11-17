@@ -223,7 +223,8 @@ describe('an exported portable-lock bundle enforces in a foreign repo (#325)', (
     };
     const exported = manifest.checks[0]?.command ?? '';
     expect(exported).toStartWith('npx --yes @noctcore/harness@');
-    expect(exported).toContain(`lint-meta --registry ${REGISTRY_REL}`);
+    // The exporter writes `/` separators on every platform.
+    expect(exported).toContain(`lint-meta --registry ${REGISTRY_REL.split(path.sep).join('/')}`);
     manifest.checks[0]!.command = exported.replace(
       /^npx --yes @noctcore\/harness@[^ ]+/,
       `node ${CLI}`,

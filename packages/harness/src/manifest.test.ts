@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { describe, expect, test } from 'bun:test';
 
 import {
@@ -8,7 +10,7 @@ import {
   planCheck,
 } from './manifest.js';
 
-const DIR = '/repo';
+const DIR = path.resolve('/repo');
 
 /** A reader that returns a fixed body regardless of path. */
 function reader(body: string | null): FileReader {
@@ -144,7 +146,7 @@ describe('loadChecks — an EXPLICIT manifest path is fail-closed (#325)', () =>
   }
 
   const BUNDLE = '.nightcore/export/portable-lock/harness.json';
-  const ABS_BUNDLE = `${DIR}/${BUNDLE}`;
+  const ABS_BUNDLE = path.resolve(DIR, BUNDLE);
 
   test('the explicit path is resolved against dir and read instead of the default', () => {
     const out = loadChecks(

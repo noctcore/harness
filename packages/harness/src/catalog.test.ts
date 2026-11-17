@@ -18,8 +18,8 @@ const RULES: IMetaRule[] = [
   { id: 'later', category: 'config', description: 'Async.', runAsync: () => Promise.resolve([]) },
 ];
 
-const REGISTRY = path.join('/repo', '.nightcore', 'lint-meta', 'registry.mts');
-const DEFAULT_OUT = path.join('/repo', '.nightcore', 'lint-meta', 'RULES.md');
+const REGISTRY = path.join(path.resolve('/repo'), '.nightcore', 'lint-meta', 'registry.mts');
+const DEFAULT_OUT = path.join(path.resolve('/repo'), '.nightcore', 'lint-meta', 'RULES.md');
 
 interface Harness {
   io: CliIO;
@@ -36,7 +36,7 @@ function harness(files: Record<string, string>, rules: IMetaRule[] = RULES): Har
   const out: string[] = [];
   const err: string[] = [];
   const io: CliIO = {
-    cwd: '/repo',
+    cwd: path.resolve('/repo'),
     read: (p) => map.get(p) ?? null,
     spawn: (): SpawnResult => ({ status: 0, signal: null, stdout: '', stderr: '' }),
     stdout: (l) => out.push(l),
@@ -62,7 +62,9 @@ describe('runCli catalog: write mode', () => {
   });
 
   test('--out is resolved against --dir, and --registry names any location', async () => {
-    const h = harness({ [path.join('/elsewhere', 'tools', 'meta', 'rules.ts')]: '// registry' });
+    const h = harness({
+      [path.join(path.resolve('/elsewhere'), 'tools', 'meta', 'rules.ts')]: '// registry',
+    });
     const code = await runCli(
       [
         'catalog',
@@ -76,8 +78,8 @@ describe('runCli catalog: write mode', () => {
       h.io,
     );
     expect(code).toBe(0);
-    expect(h.writes).toEqual([path.join('/elsewhere', 'docs', 'lint.md')]);
-    expect(h.files.get(path.join('/elsewhere', 'docs', 'lint.md'))).toContain(
+    expect(h.writes).toEqual([path.join(path.resolve('/elsewhere'), 'docs', 'lint.md')]);
+    expect(h.files.get(path.join(path.resolve('/elsewhere'), 'docs', 'lint.md'))).toContain(
       'from `tools/meta/rules.ts`',
     );
   });

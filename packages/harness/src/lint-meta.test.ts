@@ -49,7 +49,7 @@ function harness(
   };
 
   const io: CliIO = {
-    cwd: '/repo',
+    cwd: path.resolve('/repo'),
     read: (p) => {
       readPaths.push(p);
       return present.has(p) ? '// registry' : null;
@@ -62,9 +62,14 @@ function harness(
   return { io, out, err, imported, readPaths };
 }
 
-const DEFAULT_REGISTRY = path.join('/repo', '.nightcore', 'lint-meta', 'registry.js');
+const DEFAULT_REGISTRY = path.join(path.resolve('/repo'), '.nightcore', 'lint-meta', 'registry.js');
 /** The registry the portable-lock exporter emits — probed BEFORE the `.js` one. */
-const DEFAULT_TS_REGISTRY = path.join('/repo', '.nightcore', 'lint-meta', 'registry.mts');
+const DEFAULT_TS_REGISTRY = path.join(
+  path.resolve('/repo'),
+  '.nightcore',
+  'lint-meta',
+  'registry.mts',
+);
 
 describe('runCli lint-meta — opt-in-by-presence', () => {
   test('an absent registry exits 0 with a friendly note (nothing imported)', async () => {
@@ -81,7 +86,7 @@ describe('runCli lint-meta — opt-in-by-presence', () => {
     // are PROBED, never imported, when none exists.
     expect(h.readPaths.slice(0, 3)).toEqual([
       DEFAULT_TS_REGISTRY,
-      path.join('/repo', '.nightcore', 'lint-meta', 'registry.ts'),
+      path.join(path.resolve('/repo'), '.nightcore', 'lint-meta', 'registry.ts'),
       DEFAULT_REGISTRY,
     ]);
     expect(h.imported).toEqual([]);
@@ -213,9 +218,11 @@ describe('runCli lint-meta — path resolution + bounded eval', () => {
     const h = harness();
     await runCli(['lint-meta', '--dir', '/some/where'], h.io);
     expect(h.readPaths[0]).toBe(
-      path.join('/some/where', '.nightcore', 'lint-meta', 'registry.mts'),
+      path.join(path.resolve('/some/where'), '.nightcore', 'lint-meta', 'registry.mts'),
     );
-    expect(h.readPaths[2]).toBe(path.join('/some/where', '.nightcore', 'lint-meta', 'registry.js'));
+    expect(h.readPaths[2]).toBe(
+      path.join(path.resolve('/some/where'), '.nightcore', 'lint-meta', 'registry.js'),
+    );
   });
 
   test('--registry (relative to --dir) overrides the default path', async () => {

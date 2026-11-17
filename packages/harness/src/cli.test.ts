@@ -19,7 +19,7 @@ function harness(overrides: Partial<CliIO> = {}): Harness {
   const err: string[] = [];
   const readPaths: string[] = [];
   const io: CliIO = {
-    cwd: '/repo',
+    cwd: path.resolve('/repo'),
     read: (p) => {
       readPaths.push(p);
       return null;
@@ -77,7 +77,9 @@ describe('runCli check — opt-in-by-presence', () => {
   test('--dir resolves the manifest under the target directory', () => {
     const h = harness();
     runCli(['check', '--dir', '/some/where'], h.io);
-    expect(h.readPaths[0]).toBe(path.join('/some/where', '.nightcore', 'harness.json'));
+    expect(h.readPaths[0]).toBe(
+      path.join(path.resolve('/some/where'), '.nightcore', 'harness.json'),
+    );
   });
 
   test('an absent manifest with --json emits a passing result', () => {
@@ -105,13 +107,15 @@ describe('runCli check — --manifest points CI at a bundle copy (#325)', () => 
       ['check', '--dir', '/repo', '--manifest', '.nightcore/export/portable-lock/harness.json'],
       h.io,
     );
-    expect(h.readPaths[0]).toBe('/repo/.nightcore/export/portable-lock/harness.json');
+    expect(h.readPaths[0]).toBe(
+      path.resolve('/repo', '.nightcore/export/portable-lock/harness.json'),
+    );
   });
 
   test('--manifest=<path> (equals form) works too', () => {
     const h = recordingHarness();
     runCli(['check', '--dir', '/repo', '--manifest=bundle/harness.json'], h.io);
-    expect(h.readPaths[0]).toBe('/repo/bundle/harness.json');
+    expect(h.readPaths[0]).toBe(path.resolve('/repo', 'bundle/harness.json'));
   });
 
   test('an ABSENT explicit manifest reds the build (fail-closed, never a silent pass)', () => {
