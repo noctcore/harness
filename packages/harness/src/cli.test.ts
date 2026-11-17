@@ -231,7 +231,7 @@ describe('runCli check: the .nightcore/ fallback', () => {
 
   test('an explicit --manifest never consults the default or legacy paths', () => {
     const h = harness({
-      read: at({ 'bundle/harness.json': passing, [LEGACY_MANIFEST]: passing }),
+      read: at({ [path.join('bundle', 'harness.json')]: passing, [LEGACY_MANIFEST]: passing }),
     });
     expect(runCli(['check', '--manifest', 'bundle/harness.json'], h.io)).toBe(0);
     expect(h.err).toEqual([]);
