@@ -12,7 +12,8 @@ afterAll(removeFixtures);
 const CACHE_EXEMPTION: readonly ISecretExemption[] = [
   {
     secret: 'CACHE_TOKEN',
-    reason: 'the remote build cache credential every install job needs; its exposure is handled by a read-only cache on pull requests',
+    reason:
+      'the remote build cache credential every install job needs; its exposure is handled by a read-only cache on pull requests',
   },
 ];
 

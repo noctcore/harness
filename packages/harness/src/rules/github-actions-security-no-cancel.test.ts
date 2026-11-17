@@ -177,9 +177,9 @@ describe('github-actions-security-no-cancel', () => {
     const rule = createGithubActionsSecurityNoCancelRule({ securityWorkflowName: /^scan-/u });
     const violations = runSync(rule, fixture.ctx());
     expect(violations).toHaveLength(2);
-    expect(violations.every((violation) => violation.file === '.github/workflows/scan-secrets.yml')).toBe(
-      true,
-    );
+    expect(
+      violations.every((violation) => violation.file === '.github/workflows/scan-secrets.yml'),
+    ).toBe(true);
   });
 
   test('runs over every workflow file in the repo', () => {

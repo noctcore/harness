@@ -9,6 +9,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 
 const PKG_ROOT = path.resolve(import.meta.dirname, '..');
@@ -163,7 +164,11 @@ describe('an exported portable-lock bundle enforces in a foreign repo (#325)', (
     const dir = mkdtempSync(path.join(tmpdir(), 'nc-harness-export-'));
     fixtures.push(dir);
     // A CommonJS repo: nothing here is ESM by default.
-    writeFileSync(path.join(dir, 'package.json'), '{ "name": "target", "type": "commonjs" }', 'utf8');
+    writeFileSync(
+      path.join(dir, 'package.json'),
+      '{ "name": "target", "type": "commonjs" }',
+      'utf8',
+    );
     mkdirSync(path.join(dir, 'src'), { recursive: true });
     writeFileSync(path.join(dir, 'src', 'app.ts'), source, 'utf8');
 
@@ -301,7 +306,13 @@ export const IDS = rules.RULE_IDS;`,
       "lockfileVersion: '9.0'\n\npackages:\n\n  left-pad@1.3.0:\n    resolution: {commit: 5f8b2e1, repo: https://example.test/left-pad.git, type: git}\n",
       'utf8',
     );
-    const res = runNode(['lint-meta', '--dir', dir, '--registry', '.nightcore/lint-meta/registry.mjs']);
+    const res = runNode([
+      'lint-meta',
+      '--dir',
+      dir,
+      '--registry',
+      '.nightcore/lint-meta/registry.mjs',
+    ]);
     expect(res.status).toBe(1);
     expect(res.stderr).toContain('[ERROR] lockfile-registry-resolutions (pnpm-lock.yaml):');
     expect(res.stderr).toContain('resolves from a git repository');
@@ -344,7 +355,7 @@ describe('async rules and the catalog run under plain node (#277, #278)', () => 
     expect(runNode(['catalog', '--dir', dir, '--out', 'docs/RULES.md']).status).toBe(0);
     writeFileSync(
       path.join(dir, '.nightcore', 'lint-meta', 'registry.js'),
-      ASYNC_REGISTRY.replace("ciCritical: true,", ''),
+      ASYNC_REGISTRY.replace('ciCritical: true,', ''),
       'utf8',
     );
     const res = runNode(['catalog', '--check', '--dir', dir, '--out', 'docs/RULES.md']);

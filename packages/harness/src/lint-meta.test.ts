@@ -1,4 +1,5 @@
 import path from 'node:path';
+
 import { describe, expect, test } from 'bun:test';
 
 import { type CliIO, runCli } from './cli.js';
@@ -6,7 +7,12 @@ import type { ModuleImporter } from './lint-meta/registry.js';
 import type { IMetaRule, IViolation } from './lint-meta/types.js';
 import type { SpawnResult } from './run.js';
 
-const passRule: IMetaRule = { id: 'pass', category: 'source-text', description: 'ok', run: () => [] };
+const passRule: IMetaRule = {
+  id: 'pass',
+  category: 'source-text',
+  description: 'ok',
+  run: () => [],
+};
 const failRule: IMetaRule = {
   id: 'no-todo',
   category: 'source-text',
@@ -27,7 +33,9 @@ interface Harness {
  * A fake CliIO for the lint-meta path. `present` is the set of registry paths
  * `read` reports as existing; `mod` is what the injected importer resolves to.
  */
-function harness(opts: { present?: string[]; mod?: unknown; importThrows?: unknown } = {}): Harness {
+function harness(
+  opts: { present?: string[]; mod?: unknown; importThrows?: unknown } = {},
+): Harness {
   const out: string[] = [];
   const err: string[] = [];
   const imported: string[] = [];
@@ -165,7 +173,11 @@ describe('runCli lint-meta: async rules (#277)', () => {
     description: 'ESLint severities must be "error" or "off", not "warn".',
     runAsync({ root }): Promise<IViolation[]> {
       return Promise.resolve([
-        { file: `${root}/eslint.config.js`, rule: 'eslint-config-no-warn', message: 'resolves to warn' },
+        {
+          file: `${root}/eslint.config.js`,
+          rule: 'eslint-config-no-warn',
+          message: 'resolves to warn',
+        },
       ]);
     },
   };
@@ -174,7 +186,9 @@ describe('runCli lint-meta: async rules (#277)', () => {
     const h = harness({ present: [DEFAULT_REGISTRY], mod: { META_RULES: [consumerShapedRule] } });
     expect(await runCli(['lint-meta'], h.io)).toBe(1);
     expect(h.out.join('\n')).toContain('→ eslint-config-no-warn');
-    expect(h.err).toEqual(['[ERROR] eslint-config-no-warn (/repo/eslint.config.js): resolves to warn']);
+    expect(h.err).toEqual([
+      '[ERROR] eslint-config-no-warn (/repo/eslint.config.js): resolves to warn',
+    ]);
   });
 
   test('a rejecting async rule reds the build and the next rule still reports', async () => {
@@ -198,7 +212,9 @@ describe('runCli lint-meta — path resolution + bounded eval', () => {
   test('--dir relocates the default registry lookup', async () => {
     const h = harness();
     await runCli(['lint-meta', '--dir', '/some/where'], h.io);
-    expect(h.readPaths[0]).toBe(path.join('/some/where', '.nightcore', 'lint-meta', 'registry.mts'));
+    expect(h.readPaths[0]).toBe(
+      path.join('/some/where', '.nightcore', 'lint-meta', 'registry.mts'),
+    );
     expect(h.readPaths[2]).toBe(path.join('/some/where', '.nightcore', 'lint-meta', 'registry.js'));
   });
 

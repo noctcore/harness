@@ -30,7 +30,7 @@ import {
 } from './lint-meta/registry.js';
 import { exitCodeFor, reportMetaOutcomes, runMetaRules, summaryLineFor } from './lint-meta/run.js';
 import type { IMetaRule } from './lint-meta/types.js';
-import { type FileReader,loadChecks, MANIFEST_RELATIVE_PATH } from './manifest.js';
+import { type FileReader, loadChecks, MANIFEST_RELATIVE_PATH } from './manifest.js';
 import { emptyPass, fixInstruction, runChecks, type SpawnFn } from './run.js';
 
 /** The side-effecting surface `runCli` depends on — real or faked in tests. */
@@ -249,9 +249,7 @@ function runCheck(parsed: ParsedArgs, io: CliIO): number {
   }
 
   if (outcome.kind === 'schema-too-new') {
-    const label = Number.isFinite(outcome.found)
-      ? String(outcome.found)
-      : 'an unrecognized value';
+    const label = Number.isFinite(outcome.found) ? String(outcome.found) : 'an unrecognized value';
     io.stderr(
       `This .nightcore/harness.json declares schemaVersion ${label}, which this ` +
         'runner does not understand. This bundle was authored by a newer ' +

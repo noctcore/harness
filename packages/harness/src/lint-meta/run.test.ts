@@ -95,10 +95,7 @@ describe('runMetaRules — capture, never abort', () => {
   test('onRule fires once per rule, in order (legibility)', async () => {
     const seen: string[] = [];
     await runMetaRules(
-      [
-        rule({ id: 'a', run: () => [] }),
-        rule({ id: 'b', run: () => [] }),
-      ],
+      [rule({ id: 'a', run: () => [] }), rule({ id: 'b', run: () => [] })],
       CTX,
       (r) => seen.push(r.id),
     );
@@ -156,7 +153,11 @@ describe('runMetaRules: async rules (runAsync)', () => {
           ciCritical: true,
           runAsync: () => Promise.resolve([violation({ rule: 'still-runs' })]),
         }),
-        rule({ id: 'sync-after', ciCritical: true, run: () => [violation({ rule: 'sync-after' })] }),
+        rule({
+          id: 'sync-after',
+          ciCritical: true,
+          run: () => [violation({ rule: 'sync-after' })],
+        }),
       ],
       CTX,
     );
@@ -216,7 +217,7 @@ describe('runMetaRules: async rules (runAsync)', () => {
     ]);
   });
 
-  test('a sync pass that throws does not skip the same rule\'s async pass', async () => {
+  test("a sync pass that throws does not skip the same rule's async pass", async () => {
     const outcomes = await runMetaRules(
       [
         rule({

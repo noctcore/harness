@@ -10,11 +10,7 @@
  * `import type` from the published package.
  */
 export type { ManifestOutcome, PlannedCheck } from './manifest.js';
-export type {
-  CheckStatus,
-  StructureLockCheck,
-  StructureLockResult,
-} from './run.js';
+export type { CheckStatus, StructureLockCheck, StructureLockResult } from './run.js';
 
 // The PORTABLE lint-meta contract. A generated rule in a stranger's repo does
 // `import type { IMetaRule } from '@noctcore/harness'` and implements it against

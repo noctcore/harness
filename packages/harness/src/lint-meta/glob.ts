@@ -197,7 +197,8 @@ function listDir(abs: string): { name: string; isDir: boolean; isRealDir: boolea
     return readdirSync(abs, { withFileTypes: true }).map((entry) => ({
       name: entry.name,
       isRealDir: entry.isDirectory(),
-      isDir: entry.isDirectory() || (entry.isSymbolicLink() && isDirectory(path.join(abs, entry.name))),
+      isDir:
+        entry.isDirectory() || (entry.isSymbolicLink() && isDirectory(path.join(abs, entry.name))),
     }));
   } catch {
     return [];

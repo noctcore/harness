@@ -138,7 +138,11 @@ export function loadChecks(dir: string, read: FileReader, explicitPath?: string)
   const raw = read(resolved);
   if (raw === null) {
     return explicit
-      ? { kind: 'unreadable-manifest', path: resolved, reason: 'the file does not exist or is unreadable' }
+      ? {
+          kind: 'unreadable-manifest',
+          path: resolved,
+          reason: 'the file does not exist or is unreadable',
+        }
       : { kind: 'no-config' };
   }
 

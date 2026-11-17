@@ -177,7 +177,7 @@ export function fixInstruction(result: StructureLockResult): string {
   const failed = result.checks.filter((c) => c.status === 'failed');
   if (failed.length === 0) {
     return (
-      'The Structure-Lock check failed. Fix the project\'s harness checks ' +
+      "The Structure-Lock check failed. Fix the project's harness checks " +
       'before this work can be verified or merged.'
     );
   }

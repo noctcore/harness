@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import { type CliIO, nodeIO, runCli } from './cli.js';
@@ -46,9 +47,9 @@ describe('runCli — flags', () => {
     const h = harness();
     expect(runCli(['--version'], h.io)).toBe(0);
     // Matches the version the package.json declares.
-    const pkg = JSON.parse(
-      readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-    ) as { version: string };
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+      version: string;
+    };
     expect(h.out[0]).toBe(pkg.version);
   });
 
@@ -100,7 +101,10 @@ describe('runCli check — --manifest points CI at a bundle copy (#325)', () => 
 
   test('--manifest resolves against --dir and is the file read', () => {
     const h = recordingHarness();
-    runCli(['check', '--dir', '/repo', '--manifest', '.nightcore/export/portable-lock/harness.json'], h.io);
+    runCli(
+      ['check', '--dir', '/repo', '--manifest', '.nightcore/export/portable-lock/harness.json'],
+      h.io,
+    );
     expect(h.readPaths[0]).toBe('/repo/.nightcore/export/portable-lock/harness.json');
   });
 
@@ -206,13 +210,24 @@ describe('runCli check — verdicts', () => {
     expect(code).toBe(1);
     const payload = JSON.parse(jsonRun.out[0] ?? '') as {
       passed: boolean;
-      checks: Array<{ name: string; kind: string; command: string; status: string; exitCode?: number }>;
+      checks: Array<{
+        name: string;
+        kind: string;
+        command: string;
+        status: string;
+        exitCode?: number;
+      }>;
       failedCheck?: string;
     };
     expect(payload.passed).toBe(false);
     expect(payload.failedCheck).toBe('a');
     expect(payload.checks).toHaveLength(2);
-    expect(payload.checks[0]).toMatchObject({ name: 'a', kind: 'lint-plugin', status: 'failed', exitCode: 2 });
+    expect(payload.checks[0]).toMatchObject({
+      name: 'a',
+      kind: 'lint-plugin',
+      status: 'failed',
+      exitCode: 2,
+    });
     expect(payload.checks[1]).toMatchObject({ name: 'b', status: 'passed' });
 
     // The human path reaches the same verdict.

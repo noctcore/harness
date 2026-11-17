@@ -45,8 +45,7 @@ export const DEFAULT_REGISTRY_RELATIVE_PATHS = [
 export type ModuleImporter = (absPath: string) => Promise<unknown>;
 
 /** The real dynamic import, addressed by file URL so an absolute path resolves. */
-export const defaultImporter: ModuleImporter = (absPath) =>
-  import(pathToFileURL(absPath).href);
+export const defaultImporter: ModuleImporter = (absPath) => import(pathToFileURL(absPath).href);
 
 /** The result of loading a registry: its rules, or a human-readable `error`. */
 export interface LoadedRegistry {
@@ -76,11 +75,7 @@ function extractRules(mod: unknown): IMetaRule[] | null {
   if (typeof mod !== 'object' || mod === null) return null;
   const m = mod as Record<string, unknown>;
   const def = m.default as Record<string, unknown> | undefined;
-  const candidates: unknown[] = [
-    m.META_RULES,
-    def?.META_RULES,
-    m.default,
-  ];
+  const candidates: unknown[] = [m.META_RULES, def?.META_RULES, m.default];
   for (const candidate of candidates) {
     if (Array.isArray(candidate) && candidate.every(isMetaRule)) return candidate;
   }
@@ -106,7 +101,8 @@ function isTypeScript(absPath: string): boolean {
 function describeImportError(absRegistryPath: string, err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
   if (!isTypeScript(absRegistryPath)) return message;
-  const code = typeof err === 'object' && err !== null ? (err as { code?: unknown }).code : undefined;
+  const code =
+    typeof err === 'object' && err !== null ? (err as { code?: unknown }).code : undefined;
 
   if (code === 'ERR_UNKNOWN_FILE_EXTENSION' || message.includes('Unknown file extension')) {
     return `${message} — this Node cannot load a TypeScript registry. Node >= 22.18 strips types natively (${process.version} is running); upgrade Node, or point --registry at a JavaScript registry.`;

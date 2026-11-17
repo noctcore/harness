@@ -101,7 +101,9 @@ describe('pnpm-patch-ledger', () => {
   });
 
   test('stays dormant when the repo patches nothing and has no ledger', () => {
-    expect(check(createFixture({ 'package.json': JSON.stringify({ name: 'fixture' }) }))).toEqual([]);
+    expect(check(createFixture({ 'package.json': JSON.stringify({ name: 'fixture' }) }))).toEqual(
+      [],
+    );
   });
 
   test('reports a patch with no ledger entry', () => {

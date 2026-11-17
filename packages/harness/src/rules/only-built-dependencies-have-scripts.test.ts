@@ -68,7 +68,9 @@ describe('only-built-dependencies-have-scripts', () => {
       'package.json': manifest(['esbuild', '@parcel/watcher'], ['protobufjs', 'left-pad']),
     });
     expect(found).toHaveLength(1);
-    expect(found[0] ?? '').toMatch(/"left-pad" is in ignoredBuiltDependencies but is not installed/u);
+    expect(found[0] ?? '').toMatch(
+      /"left-pad" is in ignoredBuiltDependencies but is not installed/u,
+    );
   });
 
   test('reports a package with an install script that neither list names', () => {
@@ -121,9 +123,9 @@ describe('only-built-dependencies-have-scripts', () => {
         "onlyBuiltDependencies: [esbuild]\nignoredBuiltDependencies:\n  - protobufjs\n  - '@parcel/watcher'\n",
     });
     expect(found.some((message) => /package\.json is not valid JSON/u.test(message))).toBe(true);
-    expect(found.some((message) => /`onlyBuiltDependencies` holds "\[esbuild\]"/u.test(message))).toBe(
-      true,
-    );
+    expect(
+      found.some((message) => /`onlyBuiltDependencies` holds "\[esbuild\]"/u.test(message)),
+    ).toBe(true);
   });
 
   test('reports a tree with nothing installed instead of passing it', () => {

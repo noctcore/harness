@@ -131,10 +131,8 @@ describe('tailOutput (mirrors tail_output)', () => {
 
 describe('fixInstruction (mirrors fix_instruction)', () => {
   test('lists EVERY failed check with its command and output', () => {
-    const result = runChecks(
-      [check('one', 'cmd-one'), check('two', 'cmd-two')],
-      RUN_DIR,
-      () => fail(1, 'the failure body'),
+    const result = runChecks([check('one', 'cmd-one'), check('two', 'cmd-two')], RUN_DIR, () =>
+      fail(1, 'the failure body'),
     );
     const msg = fixInstruction(result);
     expect(msg).toContain('2 project harness checks did not pass');

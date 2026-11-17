@@ -63,8 +63,6 @@ export function serializeBaseline(map: Record<string, number>): string {
 
 function isNumberMap(v: unknown): v is Record<string, number> {
   return (
-    typeof v === 'object' &&
-    v !== null &&
-    Object.values(v).every((n) => typeof n === 'number')
+    typeof v === 'object' && v !== null && Object.values(v).every((n) => typeof n === 'number')
   );
 }

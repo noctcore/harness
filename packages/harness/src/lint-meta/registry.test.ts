@@ -1,10 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import {
-  DEFAULT_REGISTRY_RELATIVE_PATHS,
-  loadRegistry,
-  type ModuleImporter,
-} from './registry.js';
+import { DEFAULT_REGISTRY_RELATIVE_PATHS, loadRegistry, type ModuleImporter } from './registry.js';
 import type { IMetaRule } from './types.js';
 
 const aRule: IMetaRule = {
@@ -150,7 +146,10 @@ describe('loadRegistry — a failed TypeScript import names the fix (#325)', () 
   test('an old Node that cannot strip types is reported as a Node version problem', async () => {
     const loaded = await loadRegistry(
       '/repo/.nightcore/lint-meta/registry.ts',
-      throwing('Unknown file extension ".ts" for /repo/.nightcore/lint-meta/registry.ts', 'ERR_UNKNOWN_FILE_EXTENSION'),
+      throwing(
+        'Unknown file extension ".ts" for /repo/.nightcore/lint-meta/registry.ts',
+        'ERR_UNKNOWN_FILE_EXTENSION',
+      ),
     );
     expect(loaded.rules).toEqual([]);
     expect(loaded.error).toContain('22.18');

@@ -254,7 +254,12 @@ function parseEntry(raw: unknown): { entry: ILedgerEntry } | { error: string } {
   return { entry: { reason, upstream, removeWhen, reviewBy } };
 }
 
-function checkReviewBy(ledgerPath: string, key: string, entry: ILedgerEntry, today: Date): IViolation[] {
+function checkReviewBy(
+  ledgerPath: string,
+  key: string,
+  entry: ILedgerEntry,
+  today: Date,
+): IViolation[] {
   const { reviewBy } = entry;
   if (!ISO_DATE.test(reviewBy)) {
     return [
@@ -268,7 +273,10 @@ function checkReviewBy(ledgerPath: string, key: string, entry: ILedgerEntry, tod
   // `new Date('2026-02-31T00:00:00Z')` is March 3, not an invalid date.
   if (Number.isNaN(due.getTime()) || due.toISOString().slice(0, 10) !== reviewBy) {
     return [
-      violation(ledgerPath, `\`${key}\` has \`reviewBy: "${reviewBy}"\`, which is not a real date.`),
+      violation(
+        ledgerPath,
+        `\`${key}\` has \`reviewBy: "${reviewBy}"\`, which is not a real date.`,
+      ),
     ];
   }
   // Calendar dates, both in UTC, compared as text: the entry is due after its
@@ -373,7 +381,10 @@ export function checkPnpmPatchLedger(
   if (ledger === null) {
     return [
       ...violations,
-      violation(ledgerPath, `${ledgerPath} is not a JSON object keyed by \`patchedDependencies\` key.`),
+      violation(
+        ledgerPath,
+        `${ledgerPath} is not a JSON object keyed by \`patchedDependencies\` key.`,
+      ),
     ];
   }
 

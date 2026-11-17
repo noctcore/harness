@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 
 import { isBunRuntime, portableGlob, walkGlob } from './glob.js';
@@ -81,7 +82,9 @@ function nodeGlobSync(patterns: readonly string[]): Record<string, string[]> {
     const out = {};
     for (const p of patterns) out[p] = globSync(p, { cwd }).map((r) => r.replace(/\\\\/g, '/')).sort();
     process.stdout.write(JSON.stringify(out));`;
-  const res = spawnSync('node', ['-e', script, JSON.stringify([root, patterns])], { encoding: 'utf8' });
+  const res = spawnSync('node', ['-e', script, JSON.stringify([root, patterns])], {
+    encoding: 'utf8',
+  });
   if (res.status !== 0) throw new Error(`node globSync failed: ${res.stderr}`);
   return JSON.parse(res.stdout) as Record<string, string[]>;
 }
@@ -94,7 +97,8 @@ describe('portableGlob: parity with Node fs.globSync', () => {
   test('every corpus pattern matches exactly what Node returns', () => {
     const reference = nodeGlobSync(CORPUS);
     const mismatches = CORPUS.filter(
-      (pattern) => JSON.stringify(portableGlob(pattern, root)) !== JSON.stringify(reference[pattern]),
+      (pattern) =>
+        JSON.stringify(portableGlob(pattern, root)) !== JSON.stringify(reference[pattern]),
     ).map((pattern) => ({ pattern, ours: portableGlob(pattern, root), node: reference[pattern] }));
     expect(mismatches).toEqual([]);
     // Not vacuous: the dot-directory patterns found real files.

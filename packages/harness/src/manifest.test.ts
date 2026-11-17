@@ -31,9 +31,7 @@ describe('planCheck (command planning, mirrors plan_check)', () => {
   });
 
   test('a disabled check is skipped', () => {
-    expect(
-      planCheck({ name: 'a', kind: 'lint-plugin', command: 'x', enabled: false }),
-    ).toBeNull();
+    expect(planCheck({ name: 'a', kind: 'lint-plugin', command: 'x', enabled: false })).toBeNull();
     // enabled defaults to true.
     expect(planCheck({ name: 'a', kind: 'lint-plugin', command: 'x' })).not.toBeNull();
   });
@@ -56,7 +54,9 @@ describe('planCheck (command planning, mirrors plan_check)', () => {
   });
 
   test('timeoutMs is honored when > 0, else falls back to the default', () => {
-    expect(planCheck({ name: 'a', kind: 'k', command: 'x', timeoutMs: 5000 })?.timeoutMs).toBe(5000);
+    expect(planCheck({ name: 'a', kind: 'k', command: 'x', timeoutMs: 5000 })?.timeoutMs).toBe(
+      5000,
+    );
     expect(planCheck({ name: 'a', kind: 'k', command: 'x', timeoutMs: 0 })?.timeoutMs).toBe(
       DEFAULT_CHECK_TIMEOUT_MS,
     );
@@ -149,7 +149,10 @@ describe('loadChecks — an EXPLICIT manifest path is fail-closed (#325)', () =>
   test('the explicit path is resolved against dir and read instead of the default', () => {
     const out = loadChecks(
       DIR,
-      only(ABS_BUNDLE, JSON.stringify({ checks: [{ name: 'a', kind: 'lint-meta', command: 'x' }] })),
+      only(
+        ABS_BUNDLE,
+        JSON.stringify({ checks: [{ name: 'a', kind: 'lint-meta', command: 'x' }] }),
+      ),
       BUNDLE,
     );
     expect(out.kind).toBe('ready');

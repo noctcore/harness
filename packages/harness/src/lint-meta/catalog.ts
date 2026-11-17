@@ -41,7 +41,10 @@ function escapeCell(text: string): string {
   return text.replace(/\r?\n/g, ' ').replace(/\|/g, '\\|');
 }
 
-function formatAlignedTable(headers: readonly string[], rows: readonly (readonly string[])[]): string {
+function formatAlignedTable(
+  headers: readonly string[],
+  rows: readonly (readonly string[])[],
+): string {
   const widths = headers.map((header, col) =>
     Math.max(header.length, 3, ...rows.map((row) => row[col]?.length ?? 0)),
   );
@@ -146,7 +149,10 @@ export function diffLines(committed: string, generated: string): string[] {
     if (i < a.length && j < b.length && a[i] === b[j]) {
       i += 1;
       j += 1;
-    } else if (i < a.length && (j >= b.length || (lcs[(i + 1) * width + j] ?? 0) >= (lcs[i * width + j + 1] ?? 0))) {
+    } else if (
+      i < a.length &&
+      (j >= b.length || (lcs[(i + 1) * width + j] ?? 0) >= (lcs[i * width + j + 1] ?? 0))
+    ) {
       out.push(`-${i + 1}: ${a[i]}`);
       i += 1;
     } else {

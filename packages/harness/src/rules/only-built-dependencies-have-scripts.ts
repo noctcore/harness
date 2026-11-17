@@ -181,7 +181,10 @@ export function createOnlyBuiltDependenciesHaveScriptsRule(): IMetaRule {
           const versions = installed.filter((pkg) => pkg.name === name);
           if (versions.length === 0) {
             problems.push(
-              violation('package.json', `"${name}" is in ${list} but is not installed. Remove the entry.`),
+              violation(
+                'package.json',
+                `"${name}" is in ${list} but is not installed. Remove the entry.`,
+              ),
             );
           } else if (versions.every((pkg) => pkg.buildSteps.length === 0)) {
             problems.push(
