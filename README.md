@@ -16,7 +16,7 @@
   </p>
 
   <p>
-    <a href="https://noctcore.github.io/harness/"><strong>Docs</strong></a> (coming soon)
+    <a href="https://noctcore.github.io/harness/"><strong>Docs</strong></a>
     &nbsp;·&nbsp;
     <a href="packages/harness"><strong>Package</strong></a>
     &nbsp;·&nbsp;
