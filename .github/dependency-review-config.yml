@@ -1,0 +1,40 @@
+# Read by .github/workflows/dependency-review.yml.
+
+fail-on-severity: high
+# Runtime and development alike: the package has no runtime dependencies, so
+# every dependency here is a development one, and they all run in CI next to
+# the release job.
+fail-on-scopes: [runtime, development, unknown]
+
+# Permissive licences, plus the weak-copyleft and font licences that a docs
+# site build pulls in (MPL-2.0 for lightningcss, OFL-1.1 for the site's fonts).
+# A new licence needs an explicit decision here.
+allow-licenses:
+  - MIT
+  - MIT-0
+  - ISC
+  - 0BSD
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - Apache-2.0
+  - BlueOak-1.0.0
+  - CC0-1.0
+  - CC-BY-4.0
+  - Unlicense
+  - Python-2.0
+  - MPL-2.0
+  - OFL-1.1
+
+# Docs-site build tooling under a licence outside the list above. None of it
+# ships in the published package.
+allow-dependencies-licenses:
+  # Image processing for the docs build (LGPL-3.0-or-later native binaries).
+  - pkg:npm/%40img/sharp-libvips-darwin-arm64
+  - pkg:npm/%40img/sharp-libvips-darwin-x64
+  - pkg:npm/%40img/sharp-libvips-linux-arm64
+  - pkg:npm/%40img/sharp-libvips-linux-x64
+  - pkg:npm/%40img/sharp-libvips-linuxmusl-arm64
+  - pkg:npm/%40img/sharp-libvips-linuxmusl-x64
+  - pkg:npm/%40img/sharp-win32-x64
+  # Diagram layout for the docs site (EPL-2.0).
+  - pkg:npm/elkjs
