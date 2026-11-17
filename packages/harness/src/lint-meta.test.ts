@@ -192,7 +192,7 @@ describe('runCli lint-meta: async rules (#277)', () => {
     expect(await runCli(['lint-meta'], h.io)).toBe(1);
     expect(h.out.join('\n')).toContain('→ eslint-config-no-warn');
     expect(h.err).toEqual([
-      '[ERROR] eslint-config-no-warn (/repo/eslint.config.js): resolves to warn',
+      `[ERROR] eslint-config-no-warn (${path.resolve('/repo')}/eslint.config.js): resolves to warn`,
     ]);
   });
 
