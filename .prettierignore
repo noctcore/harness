@@ -1,0 +1,11 @@
+# Generated or recorded output: formatting it would only churn diffs.
+dist
+node_modules
+coverage
+bun.lock
+**/CHANGELOG.md
+.changeset/*.md
+# Prose is wrapped by hand.
+**/*.md
+# Fixture repos are inputs to the tests, byte for byte.
+packages/*/fixtures
