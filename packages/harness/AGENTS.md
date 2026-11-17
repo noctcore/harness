@@ -1,7 +1,7 @@
 # `@noctcore/harness` — agent contract
 
 The **portable Structure-Lock runner**. A thin, published CLI (`npx @noctcore/harness check`)
-that enforces a repo's `.nightcore/harness.json` `checks[]` in any CI, with **no Nightcore
+that enforces a repo's `.noctcore/harness.json` `checks[]` in any CI, with **no Nightcore
 install**. This is `check` PR 1 of the portable-lock series (issue #134); it is a faithful Node
 port of the in-process Rust runner in `apps/desktop/src-tauri/src/workflow/gauntlet_project/`
 (`config.rs` = load + plan, `runner.rs` = execute).
@@ -74,7 +74,7 @@ port of the in-process Rust runner in `apps/desktop/src-tauri/src/workflow/gaunt
   `.github/workflows/*.yml`; `glob.test.ts` pins parity against real Node), the run loop + `[ERROR] <rule> (<file>):
   <message>` reporter (`run.ts`), the ratchet/baseline mechanism (`baseline.ts`), and the
   BOUNDED-EVAL registry loader (`registry.ts` — imports ONLY the enumerated
-  `.nightcore/lint-meta/registry.{mts,ts,js}`, TypeScript first, never scan-and-imports any `.js`). A
+  `.noctcore/lint-meta/registry.{mts,ts,js}`, TypeScript first, never scan-and-imports any `.js`). A
   rule declares `run`, `runAsync`, or both (0.3.0); an object with neither is not a rule. A throwing
   rule, or a rejecting `runAsync`, is a critical failure (fail-safe) and never stops later rules.
   `catalog.ts` renders the registry's Markdown rule catalog (pure; the CLI owns I/O and `--check`).

@@ -10,13 +10,18 @@ runs locally (`npx harness check`) and in any CI, not only GitHub Actions; every
 after one fails, so a single run shows the whole failure set; and a check that could not run, such
 as a timeout or a missing program, is a failure with a reason instead of a skipped step.
 
-## What does `.nightcore` mean? Do I need another tool?
+## What does `.noctcore` mean? Do I need another tool?
 
-No. `.nightcore/` is the directory the runner reads by convention: the manifest at
-`.nightcore/harness.json`, the registry at `.nightcore/lint-meta/registry.mts` and baselines under
-`.nightcore/lint-meta/baselines/`. The names come from Nightcore, the noctcore desktop studio the
-runner was first written for; nothing else needs to be installed. `--manifest` and `--registry`
+No. `.noctcore/` is the directory the runner reads by convention: the manifest at
+`.noctcore/harness.json`, the registry at `.noctcore/lint-meta/registry.mts` and baselines under
+`.noctcore/lint-meta/baselines/`. Nothing else needs to be installed. `--manifest` and `--registry`
 point at files anywhere in the repo.
+
+## My repo still has a `.nightcore/` directory
+
+Releases before 0.6 read `.nightcore/`, a name from when the runner lived inside the Nightcore app.
+The runner still reads it, with a deprecation warning, until 1.0. See
+[Moving from .nightcore](/harness/guides/manifest-and-runner/#moving-from-nightcore) for the one-line move.
 
 ## Why can't my command use a pipe or `&&`?
 

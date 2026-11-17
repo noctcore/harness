@@ -115,10 +115,10 @@ describe('loadRegistry — rejected registries red the build (fail-safe)', () =>
 describe('loadRegistry — bounded eval (§5)', () => {
   test('imports EXACTLY the enumerated registry, never a stray sibling', async () => {
     const { importer, calls } = recordingImporter({ META_RULES: [aRule] });
-    const registryPath = '/repo/.nightcore/lint-meta/registry.js';
+    const registryPath = '/repo/.noctcore/lint-meta/registry.js';
     await loadRegistry(registryPath, importer);
     // The one and only import is the declared registry — a stray
-    // `/repo/.nightcore/lint-meta/evil.js` is never touched.
+    // `/repo/.noctcore/lint-meta/evil.js` is never touched.
     expect(calls).toEqual([registryPath]);
   });
 
@@ -126,9 +126,9 @@ describe('loadRegistry — bounded eval (§5)', () => {
     // A fixed, enumerated list — still bounded eval. `.mts` (what the portable-lock
     // exporter emits) wins over `.ts`, which wins over a legacy `.js` registry.
     expect(DEFAULT_REGISTRY_RELATIVE_PATHS).toEqual([
-      '.nightcore/lint-meta/registry.mts',
-      '.nightcore/lint-meta/registry.ts',
-      '.nightcore/lint-meta/registry.js',
+      '.noctcore/lint-meta/registry.mts',
+      '.noctcore/lint-meta/registry.ts',
+      '.noctcore/lint-meta/registry.js',
     ]);
   });
 });
@@ -145,9 +145,9 @@ describe('loadRegistry — a failed TypeScript import names the fix (#325)', () 
 
   test('an old Node that cannot strip types is reported as a Node version problem', async () => {
     const loaded = await loadRegistry(
-      '/repo/.nightcore/lint-meta/registry.ts',
+      '/repo/.noctcore/lint-meta/registry.ts',
       throwing(
-        'Unknown file extension ".ts" for /repo/.nightcore/lint-meta/registry.ts',
+        'Unknown file extension ".ts" for /repo/.noctcore/lint-meta/registry.ts',
         'ERR_UNKNOWN_FILE_EXTENSION',
       ),
     );
@@ -157,7 +157,7 @@ describe('loadRegistry — a failed TypeScript import names the fix (#325)', () 
 
   test('an ESM registry in a CommonJS scope points at the .mts fix', async () => {
     const loaded = await loadRegistry(
-      '/repo/.nightcore/lint-meta/registry.ts',
+      '/repo/.noctcore/lint-meta/registry.ts',
       throwing('Cannot use import statement outside a module'),
     );
     expect(loaded.error).toContain('.mts');
@@ -173,7 +173,7 @@ describe('loadRegistry — a failed TypeScript import names the fix (#325)', () 
 
   test('a JavaScript registry error is passed through verbatim (no TS advice)', async () => {
     const loaded = await loadRegistry(
-      '/repo/.nightcore/lint-meta/registry.js',
+      '/repo/.noctcore/lint-meta/registry.js',
       throwing('Cannot use import statement outside a module'),
     );
     expect(loaded.error).toBe('Cannot use import statement outside a module');

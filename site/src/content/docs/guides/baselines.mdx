@@ -19,10 +19,10 @@ As offenders are fixed their entries are deleted or lowered, never raised. The d
 
 ## The baseline file
 
-A baseline is a committed JSON file, one per rule, at `.nightcore/lint-meta/baselines/<rule-id>.json`
+A baseline is a committed JSON file, one per rule, at `.noctcore/lint-meta/baselines/<rule-id>.json`
 (`DEFAULT_BASELINE_DIR`). It is a flat map from an opaque key to a number:
 
-```json title=".nightcore/lint-meta/baselines/max-file-lines.json"
+```json title=".noctcore/lint-meta/baselines/max-file-lines.json"
 {
   "src/big.ts": 421
 }
@@ -40,12 +40,12 @@ The package root exports the helpers a rule needs at run time:
 | `loadBaseline(ctx, ruleId, dir?)` | The committed map for the rule, or `{}` when there is none (or it is not a map of numbers). |
 | `isGrandfathered(baseline, key, current)` | `true` when the key is recorded and `current` is at or under its frozen value. |
 | `serializeBaseline(map)` | The map as JSON with sorted keys and a trailing newline, for a stable diff. |
-| `DEFAULT_BASELINE_DIR` | `.nightcore/lint-meta/baselines` |
+| `DEFAULT_BASELINE_DIR` | `.noctcore/lint-meta/baselines` |
 
 A rule implements `baseline(ctx)` to snapshot the current offenders, and checks against the
 committed snapshot in `run`:
 
-<Code code={maxFileLines.trimEnd()} lang="ts" title=".nightcore/lint-meta/rules/max-file-lines.mts" />
+<Code code={maxFileLines.trimEnd()} lang="ts" title=".noctcore/lint-meta/rules/max-file-lines.mts" />
 
 `loadBaseline` and `isGrandfathered` are value imports, so the repo installs `@noctcore/harness`.
 

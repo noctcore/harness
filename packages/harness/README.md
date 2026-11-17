@@ -1,6 +1,6 @@
 # @noctcore/harness
 
-A **portable Structure-Lock runner**. It reads a repo's `.nightcore/harness.json` and runs each
+A **portable Structure-Lock runner**. It reads a repo's `.noctcore/harness.json` and runs each
 declared check, reddening the build on any violation — so a project's structure lock is enforced in
 its **own CI**, with no Nightcore install, no server, and no account.
 
@@ -8,7 +8,7 @@ its **own CI**, with no Nightcore install, no server, and no account.
 npx @noctcore/harness check
 ```
 
-Run it from the repo root (or pass `--dir <path>`). If there is no `.nightcore/harness.json`, the
+Run it from the repo root (or pass `--dir <path>`). If there is no `.noctcore/harness.json`, the
 runner exits `0` — the lock is opt-in-by-presence.
 
 ## What it does
@@ -150,7 +150,7 @@ changed lines. The catalog only imports the registry; it never runs a rule.
 ## Pointing it at a bundle (`--manifest` / `--registry`)
 
 A Nightcore **portable-lock bundle** commits its own command-translated manifest, so CI reads that
-one file instead of the live `.nightcore/harness.json`:
+one file instead of the repo's default manifest:
 
 ```bash
 npx @noctcore/harness check --manifest .nightcore/export/portable-lock/harness.json
@@ -161,13 +161,23 @@ manifest or registry is **fail-closed**: if the file you pointed at is missing (
 unparseable), the runner exits `1`. A portable lock must never pass because the thing it was told to
 enforce went missing.
 
+## Moving from `.nightcore/`
+
+Before 0.6 the runner read `.nightcore/`; the default is now `.noctcore/`. Move it with
+`git mv .nightcore .noctcore`. Until 1.0 the runner still falls back to the old location for the
+manifest, the registry and default-home baselines, printing one deprecation warning per file it
+reads there. If a file exists in both places the run stops with exit `1` and names both, instead of
+picking one. Paths you pass explicitly (`--manifest`, `--registry`, `--out`, a `baselineDir`) are
+read as given. The locations are exported (`MANIFEST_RELATIVE_PATH`,
+`DEFAULT_REGISTRY_RELATIVE_PATHS`, `DEFAULT_BASELINE_DIR` and their `LEGACY_*` counterparts).
+
 ## TypeScript rule registries
 
 `lint-meta` loads a TypeScript registry as happily as a `.js` one — Nightcore's exporter emits
 `registry.mts` and copies your generated rule files **verbatim** (it is deterministic Rust and never
 shells out to a transpiler). The type stripping happens here, in the runner, using **Node's own**
 (unflagged since Node 22.18) — which is why this package still has zero runtime dependencies. The
-default registry lookup tries `.nightcore/lint-meta/registry.mts`, then `…/registry.ts`, then
+default registry lookup tries `.noctcore/lint-meta/registry.mts`, then `…/registry.ts`, then
 `…/registry.js`.
 
 Two requirements for a TypeScript registry: **Node ≥ 22.18**, and an ES-module scope. `.mts` (what
@@ -181,12 +191,12 @@ that installs the package itself may import the `@noctcore/harness/rules` factor
 - **Not a SaaS or telemetry.** The runner makes zero network calls at run time. Everything it reads
   is committed in your repo. It has zero runtime dependencies.
 - **Not an integrity attestation.** It enforces **whatever checks are present** in your
-  `.nightcore/harness.json` and your committed rule files. It does **not** verify that those files
+  `.noctcore/harness.json` and your committed rule files. It does **not** verify that those files
   match what Nightcore originally generated — the artifacts are yours to edit. A weakened rule is
   enforced in its weakened form. The control against silent weakening is **PR review of the diff**
   (a re-export or a hand-edit shows up in `git diff`), not a signature or hash check.
 
-The `command` strings in `.nightcore/harness.json` are executed. In your own CI this is the same
+The `command` strings in `.noctcore/harness.json` are executed. In your own CI this is the same
 trust level as any `package.json` script or workflow step — your own committed, PR-reviewed config.
 The runner prints every command before running it so a reviewer reading CI logs sees exactly what
 executed.

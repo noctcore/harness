@@ -1,15 +1,15 @@
 ---
 title: The manifest and the runner
-description: Every field of .nightcore/harness.json, how harness check plans and runs each check, timeouts, --json and the exit codes.
+description: Every field of .noctcore/harness.json, how harness check plans and runs each check, timeouts, --json and the exit codes.
 ---
 
-`harness check` reads one file, `.nightcore/harness.json`, and runs the checks it lists. The runner
+`harness check` reads one file, `.noctcore/harness.json`, and runs the checks it lists. The runner
 interprets exactly one field structurally (`schemaVersion`); everything else is data, so a pinned
 runner keeps working when the manifest grows new fields.
 
 ## The manifest
 
-```json title=".nightcore/harness.json"
+```json title=".noctcore/harness.json"
 {
   "schemaVersion": 1,
   "checks": [
@@ -58,7 +58,7 @@ command and captured output.
 
 ## Opt in by presence, fail closed when named
 
-With no flags the runner reads `.nightcore/harness.json` under the target directory. A missing,
+With no flags the runner reads `.noctcore/harness.json` under the target directory. A missing,
 unreadable or malformed manifest at that default path means **nothing to enforce**, and the run
 exits `0`. A repo turns the lock on by committing the file.
 
@@ -108,3 +108,27 @@ A tool that reads the `--json` output can type it with what the package root exp
 `StructureLockResult`, `StructureLockCheck` and `CheckStatus` for the result, and
 `HarnessManifest` and `HarnessManifestCheck` for the manifest. They are listed in the
 [API reference](/harness/reference/api/noctcore/harness/).
+
+## Moving from .nightcore
+
+Before 0.6 the runner read its files from `.nightcore/`, a name from when it lived inside the
+Nightcore app. The default is now `.noctcore/`. Move the whole directory in one commit:
+
+```sh
+git mv .nightcore .noctcore
+```
+
+Until you do, the runner keeps working. For each default file (the manifest, the registry and a
+rule's baseline read through `loadBaseline` with the default directory), it reads the `.noctcore/`
+copy first. When only the `.nightcore/` copy exists it reads that one and prints one warning to
+stderr naming the new path. When both exist it stops with exit `1` and names both, rather than pick
+one: the two files can disagree, and a silent pick could enforce the wrong one. `1.0` drops the
+`.nightcore/` fallback.
+
+Paths you pass yourself are never rewritten: `--manifest`, `--registry`, `--out` and an explicit
+`baselineDir` read exactly what they name, so a bundle that points CI at
+`.nightcore/export/portable-lock/harness.json` keeps working unchanged.
+
+Tooling that writes these files can import the locations instead of hardcoding them:
+`MANIFEST_RELATIVE_PATH`, `DEFAULT_REGISTRY_RELATIVE_PATHS` and `DEFAULT_BASELINE_DIR`, plus the
+`LEGACY_*` names for the old ones, all from `@noctcore/harness`.

@@ -1,8 +1,9 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 
 import {
   DEFAULT_BASELINE_DIR,
   isGrandfathered,
+  LEGACY_BASELINE_DIR,
   loadBaseline,
   serializeBaseline,
 } from './baseline.js';
@@ -62,5 +63,59 @@ describe('loadBaseline — round-trips through the ctx at the portable home', ()
     expect(loadBaseline(ctx, 'r', 'custom/dir')).toEqual({ k: 1 });
     // and the default home is empty for the same rule id
     expect(loadBaseline(ctx, 'r')).toEqual({});
+  });
+});
+
+describe('loadBaseline: the .nightcore/ fallback for the default home', () => {
+  test('the default home is .noctcore/, the legacy one .nightcore/', () => {
+    expect(DEFAULT_BASELINE_DIR).toBe('.noctcore/lint-meta/baselines');
+    expect(LEGACY_BASELINE_DIR).toBe('.nightcore/lint-meta/baselines');
+  });
+
+  test('new only: reads it, no warning', () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const ctx = createFakeCtx({
+        files: { [`${DEFAULT_BASELINE_DIR}/fresh.json`]: serializeBaseline({ k: 1 }) },
+      });
+      expect(loadBaseline(ctx, 'fresh')).toEqual({ k: 1 });
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test('old only: reads it and warns once, naming the new path', () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const ctx = createFakeCtx({
+        files: { [`${LEGACY_BASELINE_DIR}/old-rule.json`]: serializeBaseline({ k: 2 }) },
+      });
+      expect(loadBaseline(ctx, 'old-rule')).toEqual({ k: 2 });
+      expect(loadBaseline(ctx, 'old-rule')).toEqual({ k: 2 });
+      expect(warn).toHaveBeenCalledTimes(1);
+      const message = String(warn.mock.calls[0]?.[0]);
+      expect(message).toContain('.nightcore/lint-meta/baselines/old-rule.json');
+      expect(message).toContain('.noctcore/lint-meta/baselines/old-rule.json');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test('both: throws (the rule reds the build) instead of picking one', () => {
+    const ctx = createFakeCtx({
+      files: {
+        [`${DEFAULT_BASELINE_DIR}/dup.json`]: serializeBaseline({ k: 1 }),
+        [`${LEGACY_BASELINE_DIR}/dup.json`]: serializeBaseline({ k: 9 }),
+      },
+    });
+    expect(() => loadBaseline(ctx, 'dup')).toThrow('Found both');
+  });
+
+  test('a custom baselineDir never falls back', () => {
+    const ctx = createFakeCtx({
+      files: { [`${LEGACY_BASELINE_DIR}/r.json`]: serializeBaseline({ k: 1 }) },
+    });
+    expect(loadBaseline(ctx, 'r', 'custom/dir')).toEqual({});
   });
 });

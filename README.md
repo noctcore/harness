@@ -44,7 +44,7 @@ Install it as a devDependency (or skip the install and run it with `npx`):
 npm install --save-dev @noctcore/harness   # or: pnpm add -D, bun add -d
 ```
 
-List the checks in `.nightcore/harness.json`:
+List the checks in `.noctcore/harness.json`:
 
 ```json
 {
@@ -72,16 +72,21 @@ Structure lock passed (2 checks).
 ```
 
 It exits `0` when every check passed and `1` when any failed, printing each failed check with its
-command and the tail of its output. With no `.nightcore/harness.json` it exits `0`: the lock is
+command and the tail of its output. With no `.noctcore/harness.json` it exits `0`: the lock is
 opt-in by presence. A command is split on whitespace and spawned without a shell, so pipes, `&&` and
 quotes do not work in it; point a check at a script instead.
+
+Coming from a release before 0.6, which read `.nightcore/`? Run `git mv .nightcore .noctcore`. Until
+then the runner still reads `.nightcore/` with a deprecation warning, and stops with an error if both
+directories hold the same file. The fallback goes away in 1.0
+([details](https://noctcore.github.io/harness/guides/manifest-and-runner/#moving-from-nightcore)).
 
 ## What each entry point does
 
 | Import or command | What it does |
 |---|---|
-| `harness check` | Runs every enabled check in `.nightcore/harness.json` with a per-check timeout (default 5 minutes), records each outcome and exits `1` if any failed. `--json` prints the result as one JSON document. |
-| `harness lint-meta` | Imports exactly one rule registry (`.nightcore/lint-meta/registry.{mts,ts,js}`) and runs its rules. A critical violation, or a rule that throws, exits `1`. |
+| `harness check` | Runs every enabled check in `.noctcore/harness.json` with a per-check timeout (default 5 minutes), records each outcome and exits `1` if any failed. `--json` prints the result as one JSON document. |
+| `harness lint-meta` | Imports exactly one rule registry (`.noctcore/lint-meta/registry.{mts,ts,js}`) and runs its rules. A critical violation, or a rule that throws, exits `1`. |
 | `harness catalog` | Writes a Markdown table of the registry's rules; `--check` fails when the committed one is stale. |
 | `@noctcore/harness` | The manifest and result types, the lint-meta contract (`IMetaRule`, `IMetaCtx`, `IViolation`), the ratchet helpers (`loadBaseline`, `isGrandfathered`, `serializeBaseline`) and `portableFileGlob`. |
 | `@noctcore/harness/rules` | Six ready-made lint-meta rules as factories: `lockfile-registry-resolutions`, `single-version-dependencies`, `only-built-dependencies-have-scripts`, `pnpm-patch-ledger`, `github-actions-secret-no-install` and `github-actions-security-no-cancel`. |
@@ -90,7 +95,7 @@ quotes do not work in it; point a check at a script instead.
 A registry is a module that exports `META_RULES`. The ready-made rules sit next to your own:
 
 ```ts
-// .nightcore/lint-meta/registry.mts
+// .noctcore/lint-meta/registry.mts
 import type { IMetaRule } from '@noctcore/harness';
 import {
   createGithubActionsSecretNoInstallRule,

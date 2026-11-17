@@ -62,11 +62,11 @@ function harness(
   return { io, out, err, imported, readPaths };
 }
 
-const DEFAULT_REGISTRY = path.join(path.resolve('/repo'), '.nightcore', 'lint-meta', 'registry.js');
+const DEFAULT_REGISTRY = path.join(path.resolve('/repo'), '.noctcore', 'lint-meta', 'registry.js');
 /** The registry the portable-lock exporter emits — probed BEFORE the `.js` one. */
 const DEFAULT_TS_REGISTRY = path.join(
   path.resolve('/repo'),
-  '.nightcore',
+  '.noctcore',
   'lint-meta',
   'registry.mts',
 );
@@ -79,14 +79,14 @@ describe('runCli lint-meta — opt-in-by-presence', () => {
     expect(h.imported).toEqual([]);
   });
 
-  test('the default registry candidates are <dir>/.nightcore/lint-meta/registry.{mts,ts,js}', async () => {
+  test('the default registry candidates are <dir>/.noctcore/lint-meta/registry.{mts,ts,js}', async () => {
     const h = harness();
     await runCli(['lint-meta'], h.io);
     // TypeScript (the exported form) is probed first, `.js` (legacy) last — and all
     // are PROBED, never imported, when none exists.
     expect(h.readPaths.slice(0, 3)).toEqual([
       DEFAULT_TS_REGISTRY,
-      path.join(path.resolve('/repo'), '.nightcore', 'lint-meta', 'registry.ts'),
+      path.join(path.resolve('/repo'), '.noctcore', 'lint-meta', 'registry.ts'),
       DEFAULT_REGISTRY,
     ]);
     expect(h.imported).toEqual([]);
@@ -105,6 +105,59 @@ describe('runCli lint-meta — opt-in-by-presence', () => {
     const h = harness({ present: [DEFAULT_REGISTRY], mod: { META_RULES: [passRule] } });
     expect(await runCli(['lint-meta'], h.io)).toBe(0);
     expect(h.imported).toEqual([DEFAULT_REGISTRY]);
+  });
+});
+
+const LEGACY_TS_REGISTRY = path.join(
+  path.resolve('/repo'),
+  '.nightcore',
+  'lint-meta',
+  'registry.mts',
+);
+
+describe('runCli lint-meta: the .nightcore/ registry fallback', () => {
+  test('only a .noctcore/ registry: it loads with no warning', async () => {
+    const h = harness({ present: [DEFAULT_TS_REGISTRY], mod: { META_RULES: [passRule] } });
+    expect(await runCli(['lint-meta'], h.io)).toBe(0);
+    expect(h.imported).toEqual([DEFAULT_TS_REGISTRY]);
+    expect(h.err).toEqual([]);
+  });
+
+  test('only a .nightcore/ registry: it loads, with one deprecation warning', async () => {
+    const h = harness({ present: [LEGACY_TS_REGISTRY], mod: { META_RULES: [passRule] } });
+    expect(await runCli(['lint-meta'], h.io)).toBe(0);
+    expect(h.imported).toEqual([LEGACY_TS_REGISTRY]);
+    expect(h.err).toHaveLength(1);
+    expect(h.err[0]).toContain('Deprecated: read .nightcore/lint-meta/registry.mts');
+    expect(h.err[0]).toContain('Move it to .noctcore/lint-meta/registry.mts');
+  });
+
+  test('both: exit 1 naming both, and nothing is imported', async () => {
+    const h = harness({
+      present: [DEFAULT_REGISTRY, LEGACY_TS_REGISTRY],
+      mod: { META_RULES: [passRule] },
+    });
+    expect(await runCli(['lint-meta'], h.io)).toBe(1);
+    expect(h.imported).toEqual([]);
+    expect(h.err.join('\n')).toContain(
+      'Found both .noctcore/lint-meta/registry.js and .nightcore/lint-meta/registry.mts',
+    );
+  });
+
+  test('neither: nothing to enforce, naming the .noctcore/ location', async () => {
+    const h = harness();
+    expect(await runCli(['lint-meta'], h.io)).toBe(0);
+    expect(h.out.join('\n')).toContain('.noctcore/lint-meta/registry.mts');
+    expect(h.err).toEqual([]);
+  });
+
+  test('catalog follows the same fallback: RULES.md lands beside the legacy registry', async () => {
+    const written: string[] = [];
+    const h = harness({ present: [LEGACY_TS_REGISTRY], mod: { META_RULES: [passRule] } });
+    h.io.write = (p) => written.push(p);
+    expect(await runCli(['catalog'], h.io)).toBe(0);
+    expect(written).toEqual([path.join(path.dirname(LEGACY_TS_REGISTRY), 'RULES.md')]);
+    expect(h.err.join('\n')).toContain('Deprecated');
   });
 });
 
@@ -218,10 +271,10 @@ describe('runCli lint-meta — path resolution + bounded eval', () => {
     const h = harness();
     await runCli(['lint-meta', '--dir', '/some/where'], h.io);
     expect(h.readPaths[0]).toBe(
-      path.join(path.resolve('/some/where'), '.nightcore', 'lint-meta', 'registry.mts'),
+      path.join(path.resolve('/some/where'), '.noctcore', 'lint-meta', 'registry.mts'),
     );
     expect(h.readPaths[2]).toBe(
-      path.join(path.resolve('/some/where'), '.nightcore', 'lint-meta', 'registry.js'),
+      path.join(path.resolve('/some/where'), '.noctcore', 'lint-meta', 'registry.js'),
     );
   });
 
