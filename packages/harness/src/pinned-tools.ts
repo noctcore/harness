@@ -22,8 +22,9 @@ export {
   pinnedGitleaksVersion,
   runGitleaks,
 } from './pinned-tools/gitleaks.js';
-export type { INodeFetchOptions } from './pinned-tools/node.js';
+export type { INodeFetchOptions, INodeRunOptions } from './pinned-tools/node.js';
 export {
+  DOCKER_COMMAND,
   dockerAvailable,
   nodeFetchDeps,
   nodeGitleaksDeps,

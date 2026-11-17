@@ -122,7 +122,7 @@ process.exit(exitCodeFor(result.status)); // 0 passed, 1 failed, 2 blocked
 | `runGitleaks(version, root, deps, options)` | A full-history gitleaks scan at the version CI installs (`pinnedGitleaksVersion` reads it from a workflow), else `GITLEAKS_IMAGE` when its tag names that version. A worktree, whose `.git` the image cannot follow, needs the native binary. |
 | `fetchPinned(tools, arch, dir, deps)` | Install pinned linux assets after checking each sha256, then require the pinned version. |
 | `placeBinary(bytes, name, dir, token)` | Put a binary in place through a staged file and a rename, so an existing symlink is replaced, never written through. |
-| `nodeRunDeps()`, `nodeGitleaksDeps(root)`, `nodeFetchDeps({ download })` | The real I/O for the functions above. |
+| `nodeRunDeps({ docker })`, `nodeGitleaksDeps(root)`, `nodeFetchDeps({ download })` | The real I/O for the functions above. `docker` names another container CLI (default `docker`). |
 
 Every function takes its I/O as deps, so a repo tests its own wiring without spawning anything. A
 repo that needs another version passes its own pin; moving a default pin is a minor release. Like

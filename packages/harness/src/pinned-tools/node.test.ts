@@ -99,24 +99,17 @@ describe('nodeFetchDeps', () => {
   });
 });
 
-describe('the Docker probes, with no docker on PATH', () => {
-  // An empty PATH makes every `docker` spawn fail to start, so these run the
-  // real probes without ever reaching a daemon or a registry.
-  function withoutPath<T>(run: () => T): T {
-    const saved = process.env.PATH;
-    process.env.PATH = '';
-    try {
-      return run();
-    } finally {
-      process.env.PATH = saved;
-    }
-  }
+describe('the Docker probes, through a CLI that does not exist', () => {
+  // A command name nothing provides makes every probe fail to start, so these
+  // run the real probes without ever reaching a daemon or a registry.
+  const MISSING = 'no-such-container-cli-x';
 
   test('report no daemon, no local image and a failed pull, instead of throwing', () => {
-    const deps = nodeRunDeps();
-    expect(withoutPath(() => dockerAvailable())).toBe(false);
-    expect(withoutPath(() => deps.imagePresent('example.invalid/tool:1.0.0'))).toBe(false);
-    expect(withoutPath(() => deps.pull('example.invalid/tool:1.0.0'))).toBe(false);
+    const deps = nodeRunDeps({ docker: MISSING });
+    expect(dockerAvailable(MISSING)).toBe(false);
+    expect(deps.dockerAvailable()).toBe(false);
+    expect(deps.imagePresent('example.invalid/tool:1.0.0')).toBe(false);
+    expect(deps.pull('example.invalid/tool:1.0.0')).toBe(false);
   });
 });
 

@@ -25,9 +25,12 @@ import { placeBinary } from './place-binary.js';
 import type { IRunDeps } from './route.js';
 import { parseVersion } from './route.js';
 
-/** Whether a Docker daemon answers. */
-export function dockerAvailable(): boolean {
-  const result = spawnSync('docker', ['info', '--format', '{{.ServerVersion}}'], {
+/** The container CLI the image route runs, unless the caller names another. */
+export const DOCKER_COMMAND = 'docker';
+
+/** Whether a Docker daemon answers through `docker` (or the named CLI). */
+export function dockerAvailable(docker: string = DOCKER_COMMAND): boolean {
+  const result = spawnSync(docker, ['info', '--format', '{{.ServerVersion}}'], {
     encoding: 'utf8',
   });
   return result.error === undefined && result.status === 0;
@@ -54,18 +57,24 @@ function reportedVersion(command: string, args: readonly string[]): string | nul
   return parseVersion(`${result.stdout}\n${result.stderr}`);
 }
 
+export interface INodeRunOptions {
+  /** The container CLI the probes call. Defaults to `docker`. */
+  readonly docker?: string;
+}
+
 /** `runLinter`'s deps on this machine: PATH, the Docker CLI, and the repo's workflow files. */
-export function nodeRunDeps(): IRunDeps {
+export function nodeRunDeps(options: INodeRunOptions = {}): IRunDeps {
+  const docker = options.docker ?? DOCKER_COMMAND;
   return {
     workflows: workflowFilesUnder,
     nativeVersion: (tool) => reportedVersion(tool.name, tool.versionArgs),
-    dockerAvailable,
+    dockerAvailable: () => dockerAvailable(docker),
     imagePresent: (image) => {
-      const result = spawnSync('docker', ['image', 'inspect', image], { encoding: 'utf8' });
+      const result = spawnSync(docker, ['image', 'inspect', image], { encoding: 'utf8' });
       return result.error === undefined && result.status === 0;
     },
     pull: (image) => {
-      const result = spawnSync('docker', ['pull', '--quiet', image], { stdio: 'inherit' });
+      const result = spawnSync(docker, ['pull', '--quiet', image], { stdio: 'inherit' });
       return result.error === undefined && result.status === 0;
     },
     spawn: spawnShown,
