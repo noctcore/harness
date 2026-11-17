@@ -1,0 +1,109 @@
+---
+title: Getting started
+description: Install @noctcore/harness, list your checks in a harness.json, add a rule registry and run it all in CI.
+---
+
+import { Code, Steps } from '@astrojs/starlight/components';
+import manifest from '../../../../snippets/harness.json?raw';
+import registry from '../../../../snippets/lint-meta/registry.mts?raw';
+import readmeRule from '../../../../snippets/lint-meta/rules/readme-has-license.mts?raw';
+
+`@noctcore/harness` runs under plain Node 22 or later (22.18 or later to load a TypeScript rule
+registry). It has no runtime dependencies and makes no network call, so it adds nothing to your
+supply chain beyond itself.
+
+<Steps>
+
+1. **Install it** as a devDependency. You can also skip this and run it with `npx`, but a registry
+   that imports the ready-made rules needs the package installed.
+
+   ```sh
+   npm install --save-dev @noctcore/harness   # or: pnpm add -D, bun add -d
+   ```
+
+2. **List your checks** in `.nightcore/harness.json`. Each check has a `name`, a free-form `kind`
+   and the `command` to run. This one runs the tests and the repo's lint-meta rules:
+
+   <Code code={manifest.trimEnd()} lang="json" title=".nightcore/harness.json" />
+
+3. **Run it.**
+
+   ```sh
+   npx harness check
+   ```
+
+   ```
+   → unit-tests: node --test
+   → repo-rules: npx harness lint-meta
+   ✓ unit-tests (exit 0)
+   ✓ repo-rules (exit 0)
+
+   Structure lock passed (2 checks).
+   ```
+
+   Every command is printed before it runs. The run exits `0` when every check passed and `1` when
+   any failed.
+
+4. **Add a rule registry** for the checks ESLint cannot reach: whole-repo contracts, workflow files,
+   the lockfile. The registry exports `META_RULES`:
+
+   <Code code={registry.trimEnd()} lang="ts" title=".nightcore/lint-meta/registry.mts" />
+
+   A rule of your own is an object with an `id`, a `category`, a `description` and a `run`:
+
+   <Code code={readmeRule.trimEnd()} lang="ts" title=".nightcore/lint-meta/rules/readme-has-license.mts" />
+
+5. **Run it in CI.** Any CI that has Node works. In GitHub Actions:
+
+   ```yaml title=".github/workflows/harness.yml"
+   name: harness
+   on: [push, pull_request]
+   permissions:
+     contents: read
+   jobs:
+     check:
+       runs-on: ubuntu-24.04
+       steps:
+         - uses: actions/checkout@v7 # pin to a full commit SHA in your repo
+         - uses: actions/setup-node@v7 # pin to a full commit SHA in your repo
+           with:
+             node-version: 22
+         - run: npm ci
+         - run: npx harness check
+   ```
+
+</Steps>
+
+## When a check fails
+
+The runner does not stop at the first failure. It runs every check, then prints each failed one with
+its command and the tail of its output, so one CI run shows the whole failure set:
+
+```
+→ unit-tests: node --test
+→ repo-rules: npx harness lint-meta
+✓ unit-tests (exit 0)
+✗ repo-rules (exit 1)
+
+The Structure-Lock check failed: 1 project harness check did not pass. They MUST all pass before this work can be verified or merged. Re-run each one locally and fix every violation it reports:
+
+--- `repo-rules` ---
+Command: npx harness lint-meta
+
+Output:
+lint-meta: running 3 rules from /repo/.nightcore/lint-meta/registry.mts
+→ github-actions-secret-no-install
+→ github-actions-security-no-cancel
+→ readme-has-license
+
+[ERROR] github-actions-secret-no-install (.github/workflows/release.yml): Job `publish` (line 5) reads `NPM_TOKEN` (line 12) and installs packages on line 9. Every package's lifecycle scripts run in that job, and what they leave behind runs in the step that holds the secret. Move the secret's step into a job of its own that checks out and runs no package install.
+```
+
+## Next
+
+- [The manifest and the runner](/harness/guides/manifest-and-runner/): every field, the timeouts,
+  `--json` and the exit codes.
+- [Writing a lint-meta rule](/harness/guides/writing-a-rule/): the rule contract and `ctx`.
+- [Using the rules](/harness/rules/): the six ready-made rules and their options.
+- [Pinned tools](/harness/guides/pinned-tools/): zizmor, actionlint and gitleaks at exactly their
+  pinned version.

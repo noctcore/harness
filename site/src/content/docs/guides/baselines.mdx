@@ -1,0 +1,83 @@
+---
+title: Baselines and the ratchet
+description: Turn on a rule in a repo that already breaks it. Freeze today's offenders in a committed baseline; new ones fail and the frozen ones may only shrink.
+---
+
+import { Code } from '@astrojs/starlight/components';
+import maxFileLines from '../../../../snippets/lint-meta/rules/max-file-lines.mts?raw';
+import freeze from '../../../../snippets/scripts/freeze-baseline.mts?raw';
+
+A new rule in an old repo usually finds offenders on day one. Fixing all of them before the rule can
+go on means the rule never goes on. A **baseline** freezes today's offenders at their current value
+so the rule can be strict from now on:
+
+- a **new** offender fails;
+- a **recorded** offender that **grew** past its frozen value fails;
+- a recorded offender that stayed the same or shrank passes.
+
+As offenders are fixed their entries are deleted or lowered, never raised. The debt only shrinks.
+
+## The baseline file
+
+A baseline is a committed JSON file, one per rule, at `.nightcore/lint-meta/baselines/<rule-id>.json`
+(`DEFAULT_BASELINE_DIR`). It is a flat map from an opaque key to a number:
+
+```json title=".nightcore/lint-meta/baselines/max-file-lines.json"
+{
+  "src/big.ts": 421
+}
+```
+
+The key means whatever the rule says it means. A rule that tracks more than one kind of offender
+namespaces its keys (`size:src/a.ts`, `exports:src/a.ts`) so one map holds both.
+
+## A ratcheting rule
+
+The package root exports the helpers a rule needs at run time:
+
+| Export | What it does |
+|---|---|
+| `loadBaseline(ctx, ruleId, dir?)` | The committed map for the rule, or `{}` when there is none (or it is not a map of numbers). |
+| `isGrandfathered(baseline, key, current)` | `true` when the key is recorded and `current` is at or under its frozen value. |
+| `serializeBaseline(map)` | The map as JSON with sorted keys and a trailing newline, for a stable diff. |
+| `DEFAULT_BASELINE_DIR` | `.nightcore/lint-meta/baselines` |
+
+A rule implements `baseline(ctx)` to snapshot the current offenders, and checks against the
+committed snapshot in `run`:
+
+<Code code={maxFileLines.trimEnd()} lang="ts" title=".nightcore/lint-meta/rules/max-file-lines.mts" />
+
+`loadBaseline` and `isGrandfathered` are value imports, so the repo installs `@noctcore/harness`.
+
+## Writing the baseline
+
+The runner does not write baselines: freezing debt is a decision that should show up as a reviewed
+diff, not a side effect of a CI run. A short script calls the rule's `baseline` and writes the file:
+
+<Code code={freeze.trimEnd()} lang="ts" title="scripts/freeze-baseline.mts" />
+
+```sh
+node scripts/freeze-baseline.mts
+```
+
+Before the baseline, the rule reports the file:
+
+```
+[ERROR] max-file-lines (src/big.ts): 421 lines, over the limit of 300.
+```
+
+After freezing it at 421 the rule reports nothing for it. One more line, and it fails again:
+
+```
+[ERROR] max-file-lines (src/big.ts): 422 lines, grown past its frozen 421. Shrink it back.
+```
+
+## Keeping it honest
+
+- Commit the baseline with the rule, in the same pull request, so the reviewer sees both.
+- Lower or delete entries as offenders are fixed. A rule may also fail when a recorded offender is
+  gone, so stale entries cannot pile up; that choice is the rule's.
+- Re-freezing to raise a number is the one move the ratchet exists to prevent. If it is ever right,
+  it is right in a reviewed diff with a reason.
+- The rules in `@noctcore/harness/rules` are strict and have no baseline: they hold properties that
+  should be true in every repo from the start.
