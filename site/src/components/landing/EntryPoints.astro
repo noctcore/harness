@@ -1,0 +1,34 @@
+---
+/** The commands and import paths, and where to go next. */
+const ENTRIES = [
+  { name: 'harness check', what: 'Runs every check in .nightcore/harness.json, all of them, and exits 1 if any failed.' },
+  { name: 'harness lint-meta', what: 'Runs the whole-repo rules from your registry. harness catalog writes their table.' },
+  { name: '@noctcore/harness', what: 'The rule contract, the manifest and result types, the ratchet helpers and portableFileGlob.' },
+  { name: '@noctcore/harness/rules', what: 'Six strict rules for the pnpm lockfile and GitHub Actions workflows.' },
+  { name: '@noctcore/harness/pinned-tools', what: 'zizmor, actionlint and gitleaks at exactly their pinned version.' },
+];
+---
+
+<section class="nc-section nc-packages not-content" aria-labelledby="nc-packages-title">
+  <h2 id="nc-packages-title">Two commands, three imports</h2>
+  <ul class="nc-packages__list">
+    {
+      ENTRIES.map((entry) => (
+        <li>
+          <code>{entry.name}</code>
+          <span>{entry.what}</span>
+        </li>
+      ))
+    }
+  </ul>
+  <div class="nc-next">
+    <a class="nc-next__link" href="/harness/start/getting-started/">
+      <span class="nc-next__label">Start</span>
+      <span class="nc-next__title">Add a harness.json and run it</span>
+    </a>
+    <a class="nc-next__link" href="/harness/rules/">
+      <span class="nc-next__label">Rules</span>
+      <span class="nc-next__title">Turn on the ready-made rules</span>
+    </a>
+  </div>
+</section>

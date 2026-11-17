@@ -1,0 +1,41 @@
+---
+/**
+ * Replaces Starlight's hero on splash pages. Title, tagline and actions come
+ * from the page's `hero` frontmatter; the art below is the brand hero
+ * (HeroArt.astro), one image per theme.
+ */
+import { LinkButton } from '@astrojs/starlight/components';
+import HeroArt from './landing/HeroArt.astro';
+
+const { data } = Astro.locals.starlightRoute.entry;
+const { title = data.title, tagline, actions = [] } = data.hero ?? {};
+---
+
+<header class="nc-hero not-content">
+  <div class="nc-hero__lead">
+    <p class="nc-eyebrow">Verification for TypeScript repos</p>
+    <h1 id="_top" data-page-title set:html={title} />
+  </div>
+  <div class="nc-hero__copy">
+    {tagline && <p class="nc-hero__tagline" set:html={tagline} />}
+    {
+      actions.length > 0 && (
+        <div class="nc-hero__actions">
+          {actions.map(({ link: href, text, variant, icon }) => (
+            <LinkButton {href} {variant} icon={icon?.name}>
+              {text}
+            </LinkButton>
+          ))}
+        </div>
+      )
+    }
+    <p class="nc-install">
+      <span class="nc-install__prompt" aria-hidden="true">$</span>
+      <code>npx @noctcore/harness check</code>
+    </p>
+    <p class="nc-hero__status">Zero runtime dependencies. No network call. Node 22 or later.</p>
+  </div>
+  <figure class="nc-hero__art" data-slot="hero-art">
+    <HeroArt />
+  </figure>
+</header>

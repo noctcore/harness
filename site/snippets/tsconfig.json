@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    // The samples import the package the way a consumer does; the paths point
+    // at its sources so they typecheck without a build.
+    "paths": {
+      "@noctcore/harness": ["../../packages/harness/src/index.ts"],
+      "@noctcore/harness/rules": ["../../packages/harness/src/rules.ts"],
+      "@noctcore/harness/pinned-tools": ["../../packages/harness/src/pinned-tools.ts"]
+    }
+  },
+  "include": ["**/*.mts"]
+}

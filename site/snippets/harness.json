@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "checks": [
+    { "name": "unit-tests", "kind": "test", "command": "node --test" },
+    { "name": "repo-rules", "kind": "lint-meta", "command": "npx harness lint-meta", "timeoutMs": 120000 }
+  ]
+}

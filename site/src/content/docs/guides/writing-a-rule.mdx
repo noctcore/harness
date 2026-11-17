@@ -1,0 +1,138 @@
+---
+title: Writing a lint-meta rule
+description: The IMetaRule contract, the ctx a rule reads the repo through, sync and async rules, the registry and how harness lint-meta reports.
+---
+
+import { Code } from '@astrojs/starlight/components';
+import registry from '../../../../snippets/lint-meta/registry.mts?raw';
+import readmeRule from '../../../../snippets/lint-meta/rules/readme-has-license.mts?raw';
+
+A lint-meta rule checks something about the repo as a whole: a contract between two files, a
+workflow, the lockfile, a config that must match another. ESLint sees one file at a time and only
+JavaScript; a lint-meta rule sees the whole tree. `harness lint-meta` loads your rules from one
+registry and runs them.
+
+## The contract
+
+A rule is a plain object that implements `IMetaRule` from `@noctcore/harness`:
+
+<Code code={readmeRule.trimEnd()} lang="ts" title=".nightcore/lint-meta/rules/readme-has-license.mts" />
+
+| Field | What it does |
+|---|---|
+| `id` | The rule's name in every report line. Keep it stable: it is how people find the rule. |
+| `category` | One of `config`, `source-text`, `supply-chain`, `ci` or `testing`. Shown in the catalog. |
+| `description` | One sentence on what the rule holds. Shown in the catalog. |
+| `ciCritical` | When `true`, a violation fails the run. When absent or `false`, violations print as `[info]` and the run still passes. |
+| `run(ctx)` | The sync pass. Returns an array of violations. |
+| `runAsync(ctx)` | The async pass, for a check that needs an async API. Returns a promise of violations. |
+| `baseline(ctx)` | Optional. Snapshots today's offenders for a [ratcheting rule](/harness/guides/baselines/). |
+
+A rule declares `run`, `runAsync`, or both. An object with neither is not a rule, and a registry
+that exports one fails to load. When both are present, `run` goes first and both report.
+
+A violation is `{ file, rule, message }`, plus an optional 1-based `line` and `column`. Write the
+message for the person who has to fix it: what is wrong, and what to do.
+
+## Reading the repo: `ctx`
+
+Every rule gets an `IMetaCtx` rooted at the target directory. Paths are repo-relative with `/`
+separators on every OS.
+
+| Member | What it does |
+|---|---|
+| `root` | The absolute repo root. |
+| `read(rel)` | The file's text with line endings normalized to `\n`, or `null` when it does not exist. |
+| `exists(rel)` | Whether the path exists. |
+| `glob(pattern)` | Matching **files** (never directories), sorted. It sees dot-directories such as `.github/` under both Node and Bun. |
+| `exec(cmd)` | Runs a shell command at the root and returns `{ code, stdout, stderr }`. It never throws. |
+
+Because a rule only reads through `ctx`, a test can hand it a fake one with an in-memory file map.
+The glob behind the real `ctx` is exported as `portableFileGlob(pattern, cwd)` for a repo whose own
+tooling builds a ctx.
+
+## Async rules
+
+Use `runAsync` when the check needs an async API, for example ESLint's `calculateConfigForFile`:
+
+```ts
+import type { IMetaCtx, IMetaRule, IViolation } from '@noctcore/harness';
+
+export const eslintConfigNoWarn: IMetaRule = {
+  id: 'eslint-config-no-warn',
+  category: 'config',
+  ciCritical: true,
+  description: 'ESLint severities must be "error" or "off", not "warn".',
+  async runAsync({ root }: IMetaCtx): Promise<IViolation[]> {
+    return checkResolvedConfigs(root); // your own async check
+  },
+};
+```
+
+Rules run one at a time in registry order, so the report order is the same on every run. A sync
+`run` that returns a promise is reported with the fix ("declare an async rule as runAsync").
+
+## The registry
+
+The registry is the one module `harness lint-meta` imports. It exports the rules as `META_RULES`, a
+named export or the default:
+
+<Code code={registry.trimEnd()} lang="ts" title=".nightcore/lint-meta/registry.mts" />
+
+With no `--registry`, the runner tries these paths in order and imports the first that exists:
+
+1. `.nightcore/lint-meta/registry.mts`
+2. `.nightcore/lint-meta/registry.ts`
+3. `.nightcore/lint-meta/registry.js`
+
+Exactly one file is imported. The runner never scans a directory and imports what it finds, so a
+stray `.js` dropped beside the registry is never loaded. The registry imports its own rule files.
+
+### TypeScript registries
+
+A `.mts` or `.ts` registry loads through Node's own type stripping, which is unflagged from Node
+22.18. Nothing is transpiled by the package, so it keeps zero runtime dependencies. Two things to
+know:
+
+- Use **erasable** TypeScript only: type annotations, `import type`, interfaces and type aliases.
+  Enums, namespaces and parameter properties need a transform that type stripping does not do.
+- Prefer `.mts`. It is always an ES module; a `.ts` file is one only when the nearest `package.json`
+  says `"type": "module"`. Import rule files with their real extension (`./rules/x.mts`).
+
+When a TypeScript registry fails to load, the error names the fix: a Node older than 22.18, a
+registry committed under `node_modules/`, or an ES module under a CommonJS `package.json`.
+
+### Importing from the package
+
+`import type` from `@noctcore/harness` always works, because types are erased before the code runs.
+A **value** import (the `/rules` factories, `loadBaseline`, `isGrandfathered`) resolves at run time,
+so the repo must install the package. A repo that runs `npx --yes @noctcore/harness@<version>` with
+nothing installed can only use type imports in its rules.
+
+## How a run reports
+
+```
+lint-meta: running 3 rules from /repo/.nightcore/lint-meta/registry.mts
+→ github-actions-secret-no-install
+→ github-actions-security-no-cancel
+→ readme-has-license
+[ERROR] readme-has-license (README.md): Add a "## License" section.
+```
+
+- Each rule is echoed before it runs.
+- A violation from a CI-critical rule prints `[ERROR] <rule> (<file>): <message>`; from any other
+  rule, `[info] ...`.
+- **A rule that throws, or whose `runAsync` rejects, is a critical failure** whatever its
+  `ciCritical` says, and every later rule still runs. The run then ends with a line such as
+  `lint-meta: INCOMPLETE, 1 of 3 rules threw and checked nothing (see above); 0 violations from the rest`,
+  because "no violations" from a rule that never ran is a claim nobody checked.
+- A clean run ends with `lint-meta: no violations`.
+
+`lint-meta` exits `1` on any critical failure and `0` otherwise.
+
+### Presence
+
+Like the manifest, the registry is opt in by presence: no registry at the default paths means
+nothing to enforce, exit `0`. A registry named with `--registry` is fail-closed: missing means exit
+`1`. A registry that exists but fails to import, or exports no valid `META_RULES` array, always
+exits `1`.

@@ -1,0 +1,152 @@
+---
+title: Pinned tools
+description: Run zizmor, actionlint and gitleaks at exactly their pinned version, natively or by image digest, with blocked as its own verdict; install the pinned linux binaries in CI after a sha256 check.
+---
+
+import { Code } from '@astrojs/starlight/components';
+import actionlint from '../../../../snippets/scripts/actionlint.mts?raw';
+import gitleaks from '../../../../snippets/scripts/gitleaks.mts?raw';
+import fetchPinnedScript from '../../../../snippets/scripts/fetch-pinned.mts?raw';
+import fakeDeps from '../../../../snippets/scripts/fake-deps.mts?raw';
+
+A check that shells out to a linter is only as stable as the linter's version. A new zizmor or
+actionlint release brings new rules and turns a green repo red on nobody's change, and a developer
+with a different version installed sees a different verdict than CI. `@noctcore/harness/pinned-tools`
+runs a tool at exactly its pinned version and refuses anything else.
+
+## A linter check in a few lines
+
+<Code code={actionlint.trimEnd()} lang="ts" title="scripts/actionlint.mts" />
+
+```sh
+node scripts/actionlint.mts
+```
+
+```
+actionlint: passed (no findings, native)
+```
+
+Point a manifest check at the script and the version is the same on every machine:
+
+```json
+{ "name": "actionlint", "kind": "lint", "command": "node scripts/actionlint.mts" }
+```
+
+`runLinter` lints every `.github/workflows/*.yml` and `*.yaml` file, named explicitly on the command
+line. A repo with no workflow files **fails**: nothing to lint means the path moved or the tree is
+wrong.
+
+## Routes and verdicts
+
+`runLinter` finds the tool in this order:
+
+1. **Native**: a binary on `PATH` that reports exactly the pinned version, and every tool it
+   `needs` at theirs (actionlint needs shellcheck).
+2. **Image**: the tool's image, pinned by index digest, when a Docker daemon answers. The repo is
+   mounted read-only. The image is pulled when it is not already local.
+3. **Blocked**: neither. The reason names what is missing and how to get it.
+
+A native tool of another version is never used: a different version audits with a different rule
+set.
+
+| Status | Exit code (`exitCodeFor`) | When |
+|---|---|---|
+| `passed` | `0` | The tool ran and exited 0. |
+| `failed` | `1` | The tool ran and reported findings (zizmor exits 10 to 14, actionlint 1), or failed some other way, or there are no workflow files. |
+| `blocked` | `2` | No route, the image could not be pulled, the tool could not be started, or `docker run` itself failed (exit 125). |
+
+Blocked is its own exit code on purpose: a check that could not run is never a pass, and CI can tell
+"could not check" apart from "found something".
+
+```
+zizmor: blocked (no native zizmor, and no Docker daemon answered for the pinned image. Start Docker, or install zizmor 1.30.1 (brew or scoop install zizmor).)
+```
+
+### The arguments
+
+The arguments are the same on both routes, so the native and image runs check exactly the same
+things:
+
+- **zizmor**: `--offline --no-progress <workflows>`. Offline means no GitHub API call and no token,
+  so the verdict never depends on the network. A deliberate finding is ignored in a `zizmor.yml`
+  with its reason, never by a lower level here.
+- **actionlint**: `-no-color -pyflakes= <workflows>`, plus `-shellcheck=shellcheck` on the native
+  route. `-pyflakes=` turns off the Python linter the image carries and a native install lacks.
+
+### Another container CLI
+
+`nodeRunDeps({ docker: 'podman' })` names the CLI that the probes call: the daemon check, the image
+lookup and the pull. The default is `docker`.
+
+## The default pins
+
+| Export | Version | Image (by digest) | Notes |
+|---|---|---|---|
+| `ZIZMOR` | 1.30.1 | `ghcr.io/zizmorcore/zizmor:1.30.1@sha256:a2eb39...` | Image published for `linux/amd64` only (Rosetta or QEMU elsewhere). |
+| `ACTIONLINT` | 1.7.12 | `docker.io/rhysd/actionlint:1.7.12@sha256:b1934e...` | Needs `SHELLCHECK` natively; the image bundles shellcheck 0.11.0. |
+| `SHELLCHECK` | 0.11.0 | none | Only installed natively, for actionlint. |
+| `GITLEAKS_IMAGE` | 8.30.1 | `ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6b...` | The fallback for `runGitleaks`. |
+
+`WORKFLOW_LINTERS` maps `zizmor` and `actionlint` to their pins; `WORKFLOW_LINTER_TOOLS` lists every
+binary the native route needs (zizmor, actionlint, shellcheck). Each pin also carries the linux
+release assets for x64 and arm64 with their sha256.
+
+The pins are public API. A repo that needs another version passes its own `ILinterPin` to the same
+functions. Moving a default pin is a minor release, because a new rule set can turn a green repo red.
+
+## gitleaks at CI's version
+
+A local secret scan should run the ruleset CI runs. `runGitleaks` takes the version from the caller,
+normally read from the workflow that installs gitleaks in CI:
+
+<Code code={gitleaks.trimEnd()} lang="ts" title="scripts/gitleaks.mts" />
+
+```
+INF 2 commits scanned.
+INF no leaks found
+gitleaks: passed (no findings, native)
+```
+
+- `pinnedGitleaksVersion(workflow)` reads a `GITLEAKS_VERSION: 'x.y.z'` line (or another variable
+  you name) and returns `null` when there is none. No version is blocked, never a guess.
+- The scan is `gitleaks git . --config .gitleaks.toml --no-banner --redact --exit-code 1`: full
+  history, secrets redacted in the output. `config` names another config file.
+- Routes: a native gitleaks at exactly that version; else `GITLEAKS_IMAGE` (or `image`), but only
+  when its tag names the same version, Docker answers, and `.git` is a directory. A worktree's
+  `.git` is a file pointing outside the mount, so the image could not see the history there:
+  install the native binary.
+
+## Installing the pins in CI
+
+In CI the fastest route is native. `fetchPinned` downloads each pinned linux asset, refuses any
+whose sha256 is not the pin, unpacks the binary into a directory, and refuses it again unless it
+reports the pinned version. It throws on the first problem: CI never lints with a tool it could not
+verify.
+
+The package makes no network call of its own, so the download is a function you pass in. That keeps
+the one fetch in your repo, where its origin and timeout are reviewed:
+
+<Code code={fetchPinnedScript.trimEnd()} lang="ts" title="scripts/fetch-pinned.mts" />
+
+```sh
+node scripts/fetch-pinned.mts "$RUNNER_TEMP/bin" && echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+```
+
+```
+installed zizmor 1.30.1, actionlint 1.7.12, shellcheck 0.11.0 into /tmp/bin
+```
+
+`nodeFetchDeps` is linux only: it unpacks with `tar` and the assets are linux binaries (x64 for
+GitHub runners, arm64 for `act` on Apple Silicon). Asset paths are under `https://github.com/`.
+
+`placeBinary(bytes, name, dir, token)` is what puts a bare binary in place: it writes a staged file
+and renames it over the target, so an existing symlink at that path is replaced, never written
+through.
+
+## Testing your wiring
+
+Every function takes its I/O as deps (`IRunDeps`, `IGitleaksRunDeps`, `IFetchDeps`), and
+`nodeRunDeps`, `nodeGitleaksDeps` and `nodeFetchDeps` are the real ones. A repo tests its own
+script by passing fakes, with nothing spawned and nothing downloaded:
+
+<Code code={fakeDeps.trimEnd()} lang="ts" title="a test of your own" />
