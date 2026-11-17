@@ -5,7 +5,7 @@ import path from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 
-import { isBunRuntime, portableGlob, walkGlob } from './glob.js';
+import { isBunRuntime, portableFileGlob, portableGlob, walkGlob } from './glob.js';
 
 let root: string;
 
@@ -135,5 +135,12 @@ describe('walkGlob: semantics', () => {
     expect(() => walkGlob('src/!(a).ts', root)).toThrow(/extglob/);
     expect(() => walkGlob('src/[[:alpha:]].ts', root)).toThrow(/POSIX character class/);
     expect(() => walkGlob('file{1..3}.ts', root)).toThrow(/brace range/);
+  });
+});
+
+describe('the package barrel', () => {
+  test('exports portableFileGlob for a repo that builds its own ctx', async () => {
+    const barrel = await import('../index.js');
+    expect(barrel.portableFileGlob).toBe(portableFileGlob);
   });
 });
