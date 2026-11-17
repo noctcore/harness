@@ -1,5 +1,11 @@
 # @noctcore/harness
 
+## 0.5.1
+
+### Patch Changes
+
+- [#11](https://github.com/noctcore/harness/pull/11) [`2fbaf42`](https://github.com/noctcore/harness/commit/2fbaf4238179b911e5b312bd0394ff0155659d7c) Thanks [@Shironex](https://github.com/Shironex)! - Run the pinned image through the configured container CLI. `nodeRunDeps({ docker })` named another CLI (such as `podman`) only for the daemon check, the image lookup and the pull, while `runLinter` and `runGitleaks` still spawned `docker`. The run now uses it too, `nodeGitleaksDeps` accepts the same `docker` option, and hand-built deps can set `dockerCommand`.
+
 ## 0.5.0
 
 ### Minor Changes
