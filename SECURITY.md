@@ -62,7 +62,7 @@ be met, you hear why and when.
 
 ## What does not count
 
-- The `command` strings in `.nightcore/harness.json` and the rules in a registry are executed by
+- The `command` strings in `.noctcore/harness.json` and the rules in a registry are executed by
   design. They are the repo's own committed, reviewed config, at the same trust level as a
   `package.json` script or a workflow step.
 - The runner does not attest that a manifest or a rule matches what some tool generated. A weakened

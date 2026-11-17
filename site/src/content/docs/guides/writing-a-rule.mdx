@@ -16,7 +16,7 @@ registry and runs them.
 
 A rule is a plain object that implements `IMetaRule` from `@noctcore/harness`:
 
-<Code code={readmeRule.trimEnd()} lang="ts" title=".nightcore/lint-meta/rules/readme-has-license.mts" />
+<Code code={readmeRule.trimEnd()} lang="ts" title=".noctcore/lint-meta/rules/readme-has-license.mts" />
 
 | Field | What it does |
 |---|---|
@@ -77,13 +77,13 @@ Rules run one at a time in registry order, so the report order is the same on ev
 The registry is the one module `harness lint-meta` imports. It exports the rules as `META_RULES`, a
 named export or the default:
 
-<Code code={registry.trimEnd()} lang="ts" title=".nightcore/lint-meta/registry.mts" />
+<Code code={registry.trimEnd()} lang="ts" title=".noctcore/lint-meta/registry.mts" />
 
 With no `--registry`, the runner tries these paths in order and imports the first that exists:
 
-1. `.nightcore/lint-meta/registry.mts`
-2. `.nightcore/lint-meta/registry.ts`
-3. `.nightcore/lint-meta/registry.js`
+1. `.noctcore/lint-meta/registry.mts`
+2. `.noctcore/lint-meta/registry.ts`
+3. `.noctcore/lint-meta/registry.js`
 
 Exactly one file is imported. The runner never scans a directory and imports what it finds, so a
 stray `.js` dropped beside the registry is never loaded. The registry imports its own rule files.
@@ -112,7 +112,7 @@ nothing installed can only use type imports in its rules.
 ## How a run reports
 
 ```
-lint-meta: running 3 rules from /repo/.nightcore/lint-meta/registry.mts
+lint-meta: running 3 rules from /repo/.noctcore/lint-meta/registry.mts
 → github-actions-secret-no-install
 → github-actions-security-no-cancel
 → readme-has-license

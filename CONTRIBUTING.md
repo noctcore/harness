@@ -19,7 +19,7 @@ scripts               repo checks: package shape, workflow pinning
 `packages/harness/src` is split by entry point:
 
 ```
-manifest.ts, run.ts     load and plan .nightcore/harness.json, then run every check (harness check)
+manifest.ts, run.ts     load and plan .noctcore/harness.json, then run every check (harness check)
 cli.ts                  argument parsing and dispatch for check, lint-meta and catalog
 lint-meta/              the rule contract, the registry loader, the run loop, baselines, the catalog
 rules.ts, rules/        the @noctcore/harness/rules subpath: one file per rule factory

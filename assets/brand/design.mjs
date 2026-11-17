@@ -154,7 +154,7 @@ function ledger(palette, { compact = false } = {}) {
   const spineEnd = top + step * (rows.length - 1);
   content += line(`M44 ${top - 40}V${spineEnd + 40}`, palette.line, 1);
   if (!compact)
-    content += lettering('.nightcore/harness.json', 64, top - 46, 17, palette.secondary, mono);
+    content += lettering('.noctcore/harness.json', 64, top - 46, 17, palette.secondary, mono);
   rows.forEach((row, index) => {
     const y = top + step * index;
     const passed = row.verdict === 'passed';

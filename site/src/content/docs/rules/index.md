@@ -12,7 +12,7 @@ a factory, `createXRule(options)`, that takes the repo-specific parts as options
 npm install --save-dev @noctcore/harness
 ```
 
-```ts title=".nightcore/lint-meta/registry.mts"
+```ts title=".noctcore/lint-meta/registry.mts"
 import type { IMetaRule } from '@noctcore/harness';
 import {
   createGithubActionsSecretNoInstallRule,

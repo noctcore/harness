@@ -21,10 +21,10 @@ supply chain beyond itself.
    npm install --save-dev @noctcore/harness   # or: pnpm add -D, bun add -d
    ```
 
-2. **List your checks** in `.nightcore/harness.json`. Each check has a `name`, a free-form `kind`
+2. **List your checks** in `.noctcore/harness.json`. Each check has a `name`, a free-form `kind`
    and the `command` to run. This one runs the tests and the repo's lint-meta rules:
 
-   <Code code={manifest.trimEnd()} lang="json" title=".nightcore/harness.json" />
+   <Code code={manifest.trimEnd()} lang="json" title=".noctcore/harness.json" />
 
 3. **Run it.**
 
@@ -47,11 +47,11 @@ supply chain beyond itself.
 4. **Add a rule registry** for the checks ESLint cannot reach: whole-repo contracts, workflow files,
    the lockfile. The registry exports `META_RULES`:
 
-   <Code code={registry.trimEnd()} lang="ts" title=".nightcore/lint-meta/registry.mts" />
+   <Code code={registry.trimEnd()} lang="ts" title=".noctcore/lint-meta/registry.mts" />
 
    A rule of your own is an object with an `id`, a `category`, a `description` and a `run`:
 
-   <Code code={readmeRule.trimEnd()} lang="ts" title=".nightcore/lint-meta/rules/readme-has-license.mts" />
+   <Code code={readmeRule.trimEnd()} lang="ts" title=".noctcore/lint-meta/rules/readme-has-license.mts" />
 
 5. **Run it in CI.** Any CI that has Node works. In GitHub Actions:
 
@@ -91,7 +91,7 @@ The Structure-Lock check failed: 1 project harness check did not pass. They MUST
 Command: npx harness lint-meta
 
 Output:
-lint-meta: running 3 rules from /repo/.nightcore/lint-meta/registry.mts
+lint-meta: running 3 rules from /repo/.noctcore/lint-meta/registry.mts
 → github-actions-secret-no-install
 → github-actions-security-no-cancel
 → readme-has-license
