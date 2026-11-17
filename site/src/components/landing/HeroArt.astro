@@ -1,0 +1,15 @@
+---
+/**
+ * The brand hero (assets/brand/hero-*.svg), one image per theme. The files do
+ * not read the system preference themselves, so the theme switch decides
+ * which one shows (landing.css). The run it draws is described in the alt.
+ */
+import heroDark from '../../assets/brand/hero-dark.svg?url';
+import heroLight from '../../assets/brand/hero-light.svg?url';
+
+const alt =
+  'One harness check run: unit tests, a lockfile rule and actionlint at its pinned version pass. The secret-no-install rule fails on a job that reads a token and installs packages, and zizmor is blocked with exit 2 because neither its pinned binary nor Docker is there. Every check runs, and the run exits 1 listing both.';
+---
+
+<img class="nc-hero-art nc-hero-art--dark" src={heroDark} width="1040" height="680" alt={alt} />
+<img class="nc-hero-art nc-hero-art--light" src={heroLight} width="1040" height="680" alt="" aria-hidden="true" />

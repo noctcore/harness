@@ -1,0 +1,41 @@
+---
+/** The package's hard constraints, set as a spec sheet rather than a grid of cards. */
+---
+
+<section class="nc-section nc-rules not-content" aria-labelledby="nc-rules-title">
+  <h2 id="nc-rules-title" class="nc-rules__title">What it refuses to do</h2>
+  <dl class="nc-rules__list">
+    <div class="nc-rule nc-rule--lead">
+      <dt><span class="nc-rule__no">No</span> silent pass</dt>
+      <dd>
+        A timeout, a launch failure, a rule that throws, a missing file you named with a flag, a linter that
+        could not run: each is a failure with a reason. Only a check that ran and passed is green.
+      </dd>
+    </div>
+    <div class="nc-rule">
+      <dt><span class="nc-rule__no">No</span> network call</dt>
+      <dd>
+        The package reads what is committed and nothing else. The one download, for pinned binaries in CI,
+        goes through a function your repo passes in.
+      </dd>
+    </div>
+    <div class="nc-rule">
+      <dt><span class="nc-rule__no">No</span> runtime dependency</dt>
+      <dd><code>node:*</code> builtins only. A TypeScript registry loads through Node's own type stripping.</dd>
+    </div>
+    <div class="nc-rule">
+      <dt><span class="nc-rule__no">No</span> scan and import</dt>
+      <dd>
+        <code>lint-meta</code> imports exactly one registry file from a fixed list. A stray <code>.js</code>
+        beside it is never loaded.
+      </dd>
+    </div>
+    <div class="nc-rule">
+      <dt><span class="nc-rule__no">No</span> hidden I/O</dt>
+      <dd>
+        The pinned-tools functions take their I/O as deps, and a rule reads the repo only through the
+        <code>ctx</code> it is handed, so a repo tests its own wiring without spawning anything.
+      </dd>
+    </div>
+  </dl>
+</section>

@@ -1,0 +1,44 @@
+---
+/**
+ * "Every check runs, every verdict is printed", drawn in the brand's line
+ * language: the run is one track through the rows, and each failure mode
+ * comes in from the side and stops at the part of the package that holds it.
+ */
+import { RUN } from './run';
+---
+
+<section class="nc-band not-content" aria-labelledby="nc-run-title">
+  <div class="nc-band__inner">
+    <div class="nc-section__head">
+      <h2 id="nc-run-title">Every way a gate goes soft, held.</h2>
+      <p>
+        Repo rules rot in a handful of known ways. Each row is one of them and the part of the package
+        that stops it. Every row links to the page that explains how.
+      </p>
+    </div>
+    <ol class="nc-passage">
+      {
+        RUN.map((row) => (
+          <li class="nc-passage__step">
+            <a href={row.href} class="nc-passage__link">
+              <span class="nc-passage__failure">
+                <span class="nc-passage__label">Failure</span>
+                {row.failure}
+              </span>
+              <span class="nc-passage__node" aria-hidden="true">
+                <span class="nc-passage__wire">
+                  <span class="nc-passage__dash" />
+                </span>
+                <span class="nc-passage__stop" />
+              </span>
+              <span class="nc-passage__answer">
+                <code class="nc-passage__module">{row.module}</code>
+                {row.answer}
+              </span>
+            </a>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>

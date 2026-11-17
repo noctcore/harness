@@ -1,0 +1,30 @@
+---
+title: '@noctcore/harness'
+description: Hold a TypeScript repo to its own rules in any CI, with a check runner, whole-repo lint-meta rules and pinned linters. No server, no account, no network.
+template: splash
+editUrl: false
+lastUpdated: false
+pagefind: false
+prev: false
+next: false
+hero:
+  title: Hold a repo to its own rules.
+  tagline: One committed list of checks, whole-repo rules ESLint cannot reach, and linters pinned to an exact version. Every check runs, every command is printed, and a check that could not run is never a pass.
+  actions:
+    - text: Get started
+      link: /harness/start/getting-started/
+      variant: primary
+    - text: Browse the rules
+      link: /harness/rules/
+      variant: secondary
+---
+
+import RunLedger from '../../components/landing/RunLedger.astro';
+import RegistrySample from '../../components/landing/RegistrySample.astro';
+import Principles from '../../components/landing/Principles.astro';
+import EntryPoints from '../../components/landing/EntryPoints.astro';
+
+<RunLedger />
+<RegistrySample />
+<Principles />
+<EntryPoints />

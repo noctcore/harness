@@ -1,0 +1,23 @@
+---
+/** A registry in full: the ready-made rules next to a repo's own, as one exported array. */
+import { Code } from '@astrojs/starlight/components';
+import source from '../../../snippets/lint-meta/registry.mts?raw';
+---
+
+<section class="nc-section nc-sample not-content" aria-labelledby="nc-sample-title">
+  <div class="nc-sample__text">
+    <h2 id="nc-sample-title">Your rules, in your repo.</h2>
+    <p>
+      <code>harness lint-meta</code> imports one file, the registry, and runs the rules it exports. The
+      generic ones come from <code>@noctcore/harness/rules</code>; yours sit beside them.
+    </p>
+    <ol class="nc-steps">
+      <li><span>The registry exports <code>META_RULES</code>, an array of rule objects.</span></li>
+      <li><span>Each rule reads the repo through <code>ctx</code> and returns its violations.</span></li>
+      <li><span>A violation from a CI-critical rule, or a rule that throws, exits 1.</span></li>
+    </ol>
+  </div>
+  <div class="nc-sample__code">
+    <Code code={source.trimEnd()} lang="ts" title=".nightcore/lint-meta/registry.mts" />
+  </div>
+</section>
