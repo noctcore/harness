@@ -87,6 +87,12 @@ port of the in-process Rust runner in `apps/desktop/src-tauri/src/workflow/gaunt
   check nothing throws at creation. Rule ids are public API (`RULE_IDS`): renaming one is a breaking
   change. Tests write a throwaway repo per case (`src/rules/test-support.ts`, test-only) and run the
   rule over a real `createNodeCtx`. `node:*` builtins only, like everything else here.
+- `src/pinned-tools.ts` + `src/pinned-tools/`: the `@noctcore/harness/pinned-tools` subpath.
+  Runs a linter at exactly its pinned version (native, else its image by digest, else blocked, exit
+  2) and installs pinned linux release assets after a sha256 check. Pure functions take their I/O as
+  deps; `node.ts` holds the real ones. The default pins (`pins.ts`) are public API: moving one is a
+  minor release. No network call here either: `nodeFetchDeps` takes `download` from the caller, and
+  `cli.node.test.ts` scans the built entrypoint for `fetch(`.
 - `src/index.ts` — the public type barrel (manifest + result shapes) PLUS the portable lint-meta
   contract (`IMetaRule` / `IMetaCtx` / `IViolation`) + the ratchet helpers a generated rule imports.
 

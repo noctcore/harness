@@ -3,7 +3,7 @@
   "version": "0.4.0",
   "type": "module",
   "sideEffects": false,
-  "description": "Portable Structure-Lock runner and lint-meta engine, plus generic lint-meta rules. Enforces a repo's checks in any CI, with no Nightcore install.",
+  "description": "Portable Structure-Lock runner and lint-meta engine, plus generic lint-meta rules and pinned-tool runners. Enforces a repo's checks in any CI, with no Nightcore install.",
   "license": "MIT",
   "homepage": "https://github.com/noctcore/harness/tree/main/packages/harness#readme",
   "repository": {
@@ -47,13 +47,23 @@
         "types": "./dist/rules.d.cts",
         "default": "./dist/rules.cjs"
       }
+    },
+    "./pinned-tools": {
+      "import": {
+        "types": "./dist/pinned-tools.d.ts",
+        "default": "./dist/pinned-tools.js"
+      },
+      "require": {
+        "types": "./dist/pinned-tools.d.cts",
+        "default": "./dist/pinned-tools.cjs"
+      }
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/cli.ts src/index.ts src/rules.ts --format esm,cjs --dts --clean",
+    "build": "tsup src/cli.ts src/index.ts src/rules.ts src/pinned-tools.ts --format esm,cjs --dts --clean",
     "prepack": "npm run build",
     "check-types": "tsc --noEmit",
     "test": "bun test",
