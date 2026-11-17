@@ -130,9 +130,10 @@ the manifest, writing a rule, baselines and each rule's config.
 - **Zero runtime dependencies.** `node:*` builtins only, so there is nothing to audit or pin. A
   TypeScript registry loads through Node's own type stripping (Node 22.18 or later), not a bundled
   transpiler.
-- **Dependencies injected.** Every function that touches the file system, spawns a process or reads
-  a clock takes that as an argument (`FileReader`, `SpawnFn`, `IRunDeps`, `now`), and the real ones
-  are exported beside it. A repo tests its own wiring without spawning anything.
+- **Dependencies injected.** The pinned-tools functions take their I/O as an argument (`IRunDeps`,
+  `IGitleaksRunDeps`, `IFetchDeps`) with the real ones exported beside them, a rule reads the repo
+  only through the `ctx` it is handed, and a dated rule takes a `now` clock. A repo tests its own
+  wiring without spawning anything.
 - **Fail closed.** A timeout, a launch failure, a rule that throws, a registry or manifest named
   with a flag that is missing, a manifest from a newer schema, a linter that could not run: each
   is a failure with a reason, never a silent pass.
