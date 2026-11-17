@@ -1,0 +1,59 @@
+name: Bug report
+description: The runner, a rule or a pinned-tools function crashed, misbehaved or gave the wrong verdict.
+labels: ['bug', 'pkg: harness']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. If the bug makes the package reach the network, run code the repo did not commit, or report a check that did not run as a pass, **do not file it here**: report it privately as [SECURITY.md](https://github.com/noctcore/harness/blob/main/SECURITY.md) describes.
+
+        Never paste secrets, tokens, real hostnames or private repository contents.
+  - type: dropdown
+    id: entry
+    attributes:
+      label: Entry point
+      options:
+        - 'harness check'
+        - 'harness lint-meta'
+        - 'harness catalog'
+        - '@noctcore/harness (types, baseline helpers, portableFileGlob)'
+        - '@noctcore/harness/rules'
+        - '@noctcore/harness/pinned-tools'
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `npx harness --version`.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Node and platform
+      description: For example Node 22.18 on ubuntu-24.04 in GitHub Actions, or Node 24 on Windows 11.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The smallest harness.json, registry, rule config or workflow that shows it, and the command you ran.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: The output and the exit code. Read it before pasting.
+      render: text
+    validations:
+      required: true

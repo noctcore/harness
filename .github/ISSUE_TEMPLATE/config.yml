@@ -1,0 +1,8 @@
+# Blank issues are off so every report arrives with the entry point, version
+# and platform filled in. Discussions are off for now; when they are turned on,
+# add a contact link for questions here.
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/noctcore/harness/blob/main/SECURITY.md
+    about: Report it privately as SECURITY.md describes. Please do not open a public issue for a vulnerability.

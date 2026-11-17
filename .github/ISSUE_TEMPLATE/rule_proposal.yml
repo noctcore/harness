@@ -1,0 +1,51 @@
+name: Rule or tool proposal
+description: Suggest a new rule for @noctcore/harness/rules, a new pinned tool, or a change to a default pin.
+labels: ['enhancement', 'pkg: harness']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A rule in `/rules` is generic and strict: everything repo-specific is an option, a violation fails CI, and a config that would check nothing throws. A good proposal names the mistake the rule catches and shows it in a real repo shape.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and the rule list in the docs.
+          required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of change
+      options:
+        - A new lint-meta rule
+        - A new option for an existing rule
+        - A new pinned tool
+        - Moving a default pin
+    validations:
+      required: true
+  - type: textarea
+    id: mistake
+    attributes:
+      label: The mistake it catches
+      description: What goes wrong in a repo today, and why ESLint or the tool itself does not catch it.
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: An example that should fail
+      description: A minimal workflow, lockfile excerpt, manifest or file tree. Use example.com and placeholder names.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options and defaults
+      description: What a repo would configure, and what the rule does with no options.
+  - type: textarea
+    id: breakage
+    attributes:
+      label: What it can turn red
+      description: A new rule or a moved pin is a minor release on 0.x because it can fail a repo that passed. Who would see a new failure?
