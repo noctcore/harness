@@ -20,22 +20,14 @@ port of the in-process Rust runner in `apps/desktop/src-tauri/src/workflow/gaunt
   telemetry, no rule-fetching, no self-update.
 - **Own build.** This package ships its own `tsup` `dist` (unlike `@nightcore/engine`, which the
   root `tsc -b` builds). A `files: ["dist"]` allowlist + the `build` script are load-bearing.
-- **Published to npm as `@noctcore/harness` (public).** This is the ONE workspace that ships to
-  npmjs.com — under the separate `@noctcore` org, so `package-shape` has a targeted exception (its
-  name is `@noctcore/harness`, not `@nightcore/harness`). `version` MUST stay in lockstep with
-  `PORTABLE_LOCK_RUNNER_VERSION` (`sidecar/harness/export/writer.rs`) — the exported CI template
-  pins `npx --yes @noctcore/harness@<that version> check`. **Currently out of step on purpose:**
-  this package is `0.4.0` (the `rules` subpath; `0.3.0` added async rules + `catalog`) while the
-  exporter still pins `0.2.0`. That is
-  safe, because `0.2.0` is published and the exporter emits nothing that needs a later version; bump
-  `PORTABLE_LOCK_RUNNER_VERSION` (and its test expectations) only after that version's tag is
-  published, or exported bundles red CI with an `npx` 404. Publishing is
-  human-triggered by pushing a `harness-v<version>` tag (`.github/workflows/publish-harness.yml`);
-  merging never publishes. Publishing uses npm trusted publishing (OIDC, no token): the
-  `@noctcore/harness` package trusts `noctcore/nightcore` + `publish-harness.yml` on npmjs.com.
-  **An exported bundle is only as good as the published runner it pins**: `0.2.0` adds `--manifest`
-  and TypeScript-registry support, so a bundle exported by this build reds CI (`npx` 404) until
-  `harness-v0.2.0` is tagged and published.
+- **Published to npm as `@noctcore/harness` (public), from `noctcore/harness`.** Releases go
+  through changesets: a PR that changes this package carries a changeset, the release workflow
+  opens a Version Packages PR, and merging that PR publishes with npm trusted publishing (OIDC, no
+  token; the package trusts `noctcore/harness` + `release.yml` on npmjs.com). Nothing else
+  publishes. The Nightcore desktop exporter pins a runner version (`PORTABLE_LOCK_RUNNER_VERSION`
+  in the Nightcore repo) in the CI template it writes (`npx --yes @noctcore/harness@<version>
+  check`); move that pin only after the version is on npm, or exported bundles red CI with an
+  `npx` 404.
 - **Node ≥ 22.18 for TypeScript registries.** `lint-meta` loads a `.ts` registry through Node's own
   (unflagged since 22.18) type stripping — the transpile seam for #325 deliberately lives HERE, in
   the published runner, because the Rust exporter must stay deterministic and transpiler-free. Do
@@ -100,12 +92,12 @@ port of the in-process Rust runner in `apps/desktop/src-tauri/src/workflow/gaunt
 
 ## Tests + gate
 
-`bun:test`, enrolled in the root `test:node` script (and the `check-node-coverage.ts` SUITE, so CI
-actually runs them). Run before declaring work done:
+`bun:test`. Run before declaring work done, from the repo root:
 
 ```
-bun run --filter @noctcore/harness build
+bun run build
 node packages/harness/dist/cli.js --version   # must run under plain node
-bun run test:node
-bun run lint:meta                             # package-shape / workspace-graph / enrollment / segregation
+bun run typecheck && bun run lint && bun run test
+bun run test:coverage                         # line and function floors in bunfig.toml
+bun run check:package                         # publint + attw on the packed tarball
 ```
