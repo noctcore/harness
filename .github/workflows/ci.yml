@@ -1,0 +1,88 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the same pull request makes the older run worthless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: build · lint · typecheck · package shape
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      # A frozen install passes even when bun.lock records stale workspace
+      # versions (changeset version does not touch the lockfile), so compare a
+      # refreshed lockfile with the committed one.
+      - name: bun.lock matches the manifests
+        run: bun install --lockfile-only && git diff --exit-code -- bun.lock
+      - run: bun run format:check
+      - run: bun run build
+      - run: bun run typecheck
+      - run: bun run lint
+      # Every action pinned to a full SHA with its version comment, and a
+      # top-level permissions block in every workflow.
+      - run: bun run check:workflows
+      # Packs every published package and checks the tarball with publint and
+      # @arethetypeswrong/cli.
+      - run: bun run check:package
+
+  # The suites spawn the built CLI under plain node, so node is pinned to the
+  # oldest supported line. The Windows leg is there because the package runs
+  # in consumers' CI and on developer machines on both systems.
+  test:
+    name: test${{ matrix.os == 'windows-latest' && ' · windows' || '' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    steps:
+      - if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun run test
+
+  coverage:
+    name: coverage floor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun run test:coverage

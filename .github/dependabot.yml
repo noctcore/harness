@@ -1,0 +1,44 @@
+# Keeps the pinned GitHub Actions SHAs (and their `# vX.Y.Z` comments) and the
+# Bun lockfile current. A 7-day cooldown means a freshly published release, the
+# usual window for a compromised version, is never proposed the day it lands.
+# A major version arrives as its own pull request.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ['*']
+        update-types: [minor, patch]
+    labels: [dependencies]
+    assignees: [Shironex]
+    commit-message:
+      prefix: ci
+      include: scope
+
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      typescript-eslint:
+        patterns: ['@typescript-eslint/*', 'typescript-eslint']
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: '@noctcore/harness'
+      # @types/node follows the oldest Node supported (engines: >=22).
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+    labels: [dependencies]
+    assignees: [Shironex]
+    commit-message:
+      prefix: chore
+      include: scope
