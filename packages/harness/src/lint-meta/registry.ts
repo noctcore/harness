@@ -26,20 +26,7 @@ import { pathToFileURL } from 'node:url';
 
 import type { IMetaRule } from './types.js';
 
-/**
- * The fixed, repo-relative registry paths the runner tries, in order, when no
- * `--registry` is given. TypeScript first (what Nightcore's portable-lock exporter
- * emits) so an exported registry is authoritative in a repo that still carries a
- * hand-rolled JavaScript one, and `.mts` ahead of `.ts` because that is the form the
- * exporter writes — `.mts` is an ES module whatever the repo's `package.json` says,
- * while a `.ts` in a `"type": "commonjs"` repo cannot load ESM rules at all. Still
- * BOUNDED eval: a fixed, enumerated list, of which exactly one file is ever imported.
- */
-export const DEFAULT_REGISTRY_RELATIVE_PATHS = [
-  '.nightcore/lint-meta/registry.mts',
-  '.nightcore/lint-meta/registry.ts',
-  '.nightcore/lint-meta/registry.js',
-] as const;
+export { DEFAULT_REGISTRY_RELATIVE_PATHS, LEGACY_REGISTRY_RELATIVE_PATHS } from '../paths.js';
 
 /** Imports the module at an ABSOLUTE path. Real or faked (bounded-eval tests). */
 export type ModuleImporter = (absPath: string) => Promise<unknown>;

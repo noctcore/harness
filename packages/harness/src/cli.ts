@@ -25,12 +25,19 @@ import { createNodeCtx } from './lint-meta/ctx.js';
 import {
   DEFAULT_REGISTRY_RELATIVE_PATHS,
   defaultImporter,
+  LEGACY_REGISTRY_RELATIVE_PATHS,
   loadRegistry,
   type ModuleImporter,
 } from './lint-meta/registry.js';
 import { exitCodeFor, reportMetaOutcomes, runMetaRules, summaryLineFor } from './lint-meta/run.js';
 import type { IMetaRule } from './lint-meta/types.js';
 import { type FileReader, loadChecks, MANIFEST_RELATIVE_PATH } from './manifest.js';
+import {
+  CONFIG_DIR,
+  conflictingPathsError,
+  LEGACY_CONFIG_DIR,
+  legacyPathWarning,
+} from './paths.js';
 import { emptyPass, fixInstruction, runChecks, type SpawnFn } from './run.js';
 
 /** The side-effecting surface `runCli` depends on — real or faked in tests. */
@@ -62,7 +69,7 @@ function writeFileNode(absolutePath: string, content: string): void {
 const HELP = `@noctcore/harness — portable Structure-Lock runner
 
 Usage:
-  harness [check] [options]      Run the checks declared in .nightcore/harness.json
+  harness [check] [options]      Run the checks declared in ${MANIFEST_RELATIVE_PATH}
   harness lint-meta [options]    Run the portable lint-meta rules from the enumerated registry
   harness catalog [options]      Write the registry's rule catalog (Markdown), or --check it
 
@@ -75,6 +82,8 @@ Options:
                       (default: the first of ${DEFAULT_REGISTRY_RELATIVE_PATHS.join(', ')}
                       that exists). An explicitly named registry that is missing reds the build.
                       A TypeScript registry needs Node >= 22.18 (native type stripping).
+                      Both defaults fall back to the old .nightcore/ location, with a
+                      warning, when only that file exists (until 1.0), and fail when both do.
   --out <path>        catalog only: the catalog file, relative to --dir
                       (default: ${DEFAULT_CATALOG_BASENAME} beside the registry). Text outside the
                       generated markers is kept.
@@ -86,7 +95,7 @@ Options:
 
 Exit codes:
   0  every check/rule passed (or nothing is configured to enforce)
-  1  a check failed, a rule reported a critical violation or threw, an explicitly named manifest/registry was unusable, the manifest requires a newer runner, or (catalog --check) the catalog is stale
+  1  a check failed, a rule reported a critical violation or threw, an explicitly named manifest/registry was unusable, a default manifest/registry exists under both .noctcore/ and .nightcore/, the manifest requires a newer runner, or (catalog --check) the catalog is stale
   2  a usage error`;
 
 interface ParsedArgs {
@@ -229,7 +238,12 @@ export function nodeIO(): CliIO {
 
 /** Run the `check` subcommand. Returns the process exit code. */
 function runCheck(parsed: ParsedArgs, io: CliIO): number {
-  const outcome = loadChecks(parsed.dir, io.read, parsed.manifest);
+  const outcome = loadChecks(parsed.dir, io.read, parsed.manifest, io.stderr);
+
+  if (outcome.kind === 'conflicting-manifests') {
+    io.stderr(outcome.message);
+    return 1;
+  }
 
   if (outcome.kind === 'unreadable-manifest') {
     // Fail-closed: `--manifest` named a specific file (a portable-lock bundle's
@@ -251,7 +265,7 @@ function runCheck(parsed: ParsedArgs, io: CliIO): number {
   if (outcome.kind === 'schema-too-new') {
     const label = Number.isFinite(outcome.found) ? String(outcome.found) : 'an unrecognized value';
     io.stderr(
-      `This .nightcore/harness.json declares schemaVersion ${label}, which this ` +
+      `This harness.json declares schemaVersion ${label}, which this ` +
         'runner does not understand. This bundle was authored by a newer ' +
         'Nightcore — upgrade @noctcore/harness.',
     );
@@ -287,19 +301,39 @@ function runCheck(parsed: ParsedArgs, io: CliIO): number {
   return 1;
 }
 
+/** The first of `rels` (repo-relative) that exists under `dir`, or `undefined`. */
+function firstExisting(dir: string, rels: readonly string[], io: CliIO): string | undefined {
+  return rels.find((rel) => io.read(path.join(dir, rel)) !== null);
+}
+
 /**
  * Resolve the registry to load: the explicit `--registry` (verbatim, even when
- * absent — the caller named it), else the first DEFAULT candidate that exists.
- * When no default exists, the LAST candidate is returned so the "nothing to
- * enforce" message names the canonical location.
+ * absent — the caller named it), else the first DEFAULT candidate that exists,
+ * else the first LEGACY (`.nightcore/`) candidate that exists, with a deprecation
+ * warning. A default AND a legacy registry both present is a conflict (`error`),
+ * never a silent pick. When nothing exists, the LAST default candidate is returned
+ * so the "nothing to enforce" message names the canonical location.
  */
-function resolveRegistryPath(parsed: ParsedArgs, io: CliIO): { path: string; explicit: boolean } {
+function resolveRegistryPath(
+  parsed: ParsedArgs,
+  io: CliIO,
+): { path: string; explicit: boolean } | { error: string } {
   if (parsed.registry !== undefined && parsed.registry !== '') {
     return { path: path.resolve(parsed.dir, parsed.registry), explicit: true };
   }
-  const candidates = DEFAULT_REGISTRY_RELATIVE_PATHS.map((rel) => path.join(parsed.dir, rel));
-  const found = candidates.find((candidate) => io.read(candidate) !== null);
-  return { path: found ?? candidates[candidates.length - 1] ?? '', explicit: false };
+  const current = firstExisting(parsed.dir, DEFAULT_REGISTRY_RELATIVE_PATHS, io);
+  const legacy = firstExisting(parsed.dir, LEGACY_REGISTRY_RELATIVE_PATHS, io);
+  if (current !== undefined && legacy !== undefined) {
+    return { error: conflictingPathsError(current, legacy) };
+  }
+  if (legacy !== undefined) {
+    const target = `${CONFIG_DIR}${legacy.slice(LEGACY_CONFIG_DIR.length)}`;
+    io.stderr(legacyPathWarning(legacy, target));
+    return { path: path.join(parsed.dir, legacy), explicit: false };
+  }
+  const rel =
+    current ?? DEFAULT_REGISTRY_RELATIVE_PATHS[DEFAULT_REGISTRY_RELATIVE_PATHS.length - 1];
+  return { path: rel === undefined ? '' : path.join(parsed.dir, rel), explicit: false };
 }
 
 /** A registry resolved and imported, or the exit code the caller must return. */
@@ -316,7 +350,12 @@ type RegistryLoad = { exit: number } | { path: string; rules: IMetaRule[] };
  * a stray `.js` beside it is never loaded.
  */
 async function loadRegistryFor(parsed: ParsedArgs, io: CliIO): Promise<RegistryLoad> {
-  const { path: registryPath, explicit } = resolveRegistryPath(parsed, io);
+  const resolved = resolveRegistryPath(parsed, io);
+  if ('error' in resolved) {
+    io.stderr(resolved.error);
+    return { exit: 1 };
+  }
+  const { path: registryPath, explicit } = resolved;
 
   // Presence check via a plain read (no import): an absent registry opts out —
   // unless it was named explicitly, which is fail-closed.

@@ -1,6 +1,6 @@
 /**
  * Public type surface of `@noctcore/harness`. Exposes the
- * `.nightcore/harness.json` manifest shape, the `StructureLockResult`-shaped
+ * `.noctcore/harness.json` manifest shape, the `StructureLockResult`-shaped
  * verdict the runner emits (camelCase, wire-compatible with the Rust
  * `StructureLockResult` / `StructureLockCheck`), AND the portable lint-meta
  * contract (`IMetaRule` / `IMetaCtx` / `IViolation`) a target repo's generated
@@ -23,16 +23,27 @@ export type { IMetaCtx, IMetaRule, IViolation } from './lint-meta/types.js';
 export {
   DEFAULT_BASELINE_DIR,
   isGrandfathered,
+  LEGACY_BASELINE_DIR,
   loadBaseline,
   serializeBaseline,
 } from './lint-meta/baseline.js';
+// The default locations the runner reads, and the legacy `.nightcore/` ones it
+// still falls back to until 1.0, for tooling that writes or moves these files.
+export {
+  CONFIG_DIR,
+  DEFAULT_REGISTRY_RELATIVE_PATHS,
+  LEGACY_CONFIG_DIR,
+  LEGACY_MANIFEST_RELATIVE_PATH,
+  LEGACY_REGISTRY_RELATIVE_PATHS,
+  MANIFEST_RELATIVE_PATH,
+} from './paths.js';
 // The glob behind the runner's `ctx.glob`, for a repo whose own lint tooling
 // builds its ctx: Node's `fs.globSync` rules under both Node and Bun (whose own
 // `globSync` cannot see a dot-directory), files only, sorted, and throwing on
 // syntax it does not implement instead of matching nothing.
 export { portableFileGlob } from './lint-meta/glob.js';
 
-/** One check as declared in `.nightcore/harness.json`. */
+/** One check as declared in `.noctcore/harness.json`. */
 export interface HarnessManifestCheck {
   /** The logical check name (e.g. `folder-per-component`). */
   name: string;
@@ -48,7 +59,7 @@ export interface HarnessManifestCheck {
   enabled?: boolean;
 }
 
-/** The `.nightcore/harness.json` manifest the runner reads. */
+/** The `.noctcore/harness.json` manifest the runner reads. */
 export interface HarnessManifest {
   /**
    * The manifest MAJOR schema version. Absent ⇒ treated as `1`. A higher MAJOR

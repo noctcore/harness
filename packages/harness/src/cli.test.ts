@@ -36,6 +36,14 @@ function manifest(checks: unknown[], extra: Record<string, unknown> = {}): strin
   return JSON.stringify({ ...extra, checks });
 }
 
+const CURRENT_MANIFEST = path.join('.noctcore', 'harness.json');
+const LEGACY_MANIFEST = path.join('.nightcore', 'harness.json');
+
+/** A reader that serves `body` at the default `.noctcore/harness.json` only. */
+function atDefaultManifest(body: string): CliIO['read'] {
+  return (p) => (p.endsWith(CURRENT_MANIFEST) ? body : null);
+}
+
 describe('runCli — flags', () => {
   test('--help prints usage and exits 0', () => {
     const h = harness();
@@ -78,7 +86,7 @@ describe('runCli check — opt-in-by-presence', () => {
     const h = harness();
     runCli(['check', '--dir', '/some/where'], h.io);
     expect(h.readPaths[0]).toBe(
-      path.join(path.resolve('/some/where'), '.nightcore', 'harness.json'),
+      path.join(path.resolve('/some/where'), '.noctcore', 'harness.json'),
     );
   });
 
@@ -164,9 +172,75 @@ describe('runCli check — --manifest points CI at a bundle copy (#325)', () => 
   });
 });
 
+describe('runCli check: the .nightcore/ fallback', () => {
+  const passing = manifest([{ name: 'lint', kind: 'lint-plugin', command: 'npx eslint .' }]);
+  const at =
+    (files: Record<string, string>): CliIO['read'] =>
+    (p) => {
+      for (const [rel, body] of Object.entries(files)) if (p.endsWith(rel)) return body;
+      return null;
+    };
+
+  test('only .noctcore/harness.json: it runs, with no warning', () => {
+    const h = harness({ read: at({ [CURRENT_MANIFEST]: passing }) });
+    expect(runCli(['check'], h.io)).toBe(0);
+    expect(h.out.join('\n')).toContain('Structure lock passed');
+    expect(h.err).toEqual([]);
+  });
+
+  test('only .nightcore/harness.json: it still runs, with one deprecation warning', () => {
+    const h = harness({ read: at({ [LEGACY_MANIFEST]: passing }) });
+    expect(runCli(['check'], h.io)).toBe(0);
+    expect(h.out.join('\n')).toContain('Structure lock passed');
+    expect(h.err).toHaveLength(1);
+    expect(h.err[0]).toContain('Deprecated: read .nightcore/harness.json');
+    expect(h.err[0]).toContain('Move it to .noctcore/harness.json');
+    expect(h.err[0]).toContain('1.0');
+  });
+
+  test('only the legacy manifest with --json: stdout stays one JSON document', () => {
+    const h = harness({ read: at({ [LEGACY_MANIFEST]: passing }) });
+    expect(runCli(['check', '--json'], h.io)).toBe(0);
+    expect(h.out).toHaveLength(1);
+    expect(JSON.parse(h.out[0] ?? '')).toMatchObject({ passed: true });
+    expect(h.err.join('\n')).toContain('Deprecated: read .nightcore/harness.json');
+  });
+
+  test('both manifests: exit 1 naming both, and no check runs', () => {
+    let spawned = 0;
+    const h = harness({
+      read: at({ [CURRENT_MANIFEST]: passing, [LEGACY_MANIFEST]: passing }),
+      spawn: () => {
+        spawned += 1;
+        return { status: 0, signal: null, stdout: '', stderr: '' };
+      },
+    });
+    expect(runCli(['check'], h.io)).toBe(1);
+    expect(spawned).toBe(0);
+    const err = h.err.join('\n');
+    expect(err).toContain('Found both .noctcore/harness.json and .nightcore/harness.json');
+    expect(err).toContain('delete .nightcore/harness.json');
+  });
+
+  test('neither manifest: exit 0, nothing to enforce, no warning', () => {
+    const h = harness();
+    expect(runCli(['check'], h.io)).toBe(0);
+    expect(h.out.join('\n')).toContain('No structure lock configured');
+    expect(h.err).toEqual([]);
+  });
+
+  test('an explicit --manifest never consults the default or legacy paths', () => {
+    const h = harness({
+      read: at({ 'bundle/harness.json': passing, [LEGACY_MANIFEST]: passing }),
+    });
+    expect(runCli(['check', '--manifest', 'bundle/harness.json'], h.io)).toBe(0);
+    expect(h.err).toEqual([]);
+  });
+});
+
 describe('runCli check — schemaVersion gate', () => {
   test('a newer MAJOR reds the build with an upgrade message', () => {
-    const h = harness({ read: () => manifest([], { schemaVersion: 2 }) });
+    const h = harness({ read: atDefaultManifest(manifest([], { schemaVersion: 2 })) });
     expect(runCli(['check'], h.io)).toBe(1);
     expect(h.err.join('\n')).toContain('upgrade @noctcore/harness');
   });
@@ -177,7 +251,7 @@ describe('runCli check — verdicts', () => {
 
   test('every check passing exits 0 and echoes the command (legibility)', () => {
     const h = harness({
-      read: () => passing,
+      read: atDefaultManifest(passing),
       spawn: () => ({ status: 0, signal: null, stdout: '', stderr: '' }),
     });
     expect(runCli(['check'], h.io)).toBe(0);
@@ -188,7 +262,7 @@ describe('runCli check — verdicts', () => {
 
   test('a failing check exits 1 and prints the fix instruction', () => {
     const h = harness({
-      read: () => passing,
+      read: atDefaultManifest(passing),
       spawn: () => ({ status: 1, signal: null, stdout: 'nope', stderr: '' }),
     });
     expect(runCli(['check'], h.io)).toBe(1);
@@ -197,11 +271,12 @@ describe('runCli check — verdicts', () => {
   });
 
   test('--json emits the StructureLockResult shape and the verdict matches the human path', () => {
-    const read = () =>
+    const read = atDefaultManifest(
       manifest([
         { name: 'a', kind: 'lint-plugin', command: 'run a' },
         { name: 'b', kind: 'lint-plugin', command: 'run b' },
-      ]);
+      ]),
+    );
     // First check fails, second passes → overall fail; the JSON reflects both
     // (full-run: the second still ran after the first failed).
     const failFirst = (_program: string, args: string[]): SpawnResult =>
@@ -249,14 +324,14 @@ describe('runCli check — real nodeIO over a fixture directory', () => {
   let dir: string;
   beforeEach(() => {
     dir = mkdtempSync(path.join(tmpdir(), 'nc-harness-cli-'));
-    mkdirSync(path.join(dir, '.nightcore'), { recursive: true });
+    mkdirSync(path.join(dir, '.noctcore'), { recursive: true });
   });
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
   });
 
   function writeManifest(checks: unknown[]): void {
-    writeFileSync(path.join(dir, '.nightcore', 'harness.json'), manifest(checks), 'utf8');
+    writeFileSync(path.join(dir, '.noctcore', 'harness.json'), manifest(checks), 'utf8');
   }
 
   /** nodeIO but with captured stdout/stderr (still real fs + real spawn). */

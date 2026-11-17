@@ -5,16 +5,27 @@ import { describe, expect, test } from 'bun:test';
 import {
   DEFAULT_CHECK_TIMEOUT_MS,
   type FileReader,
+  legacyManifestPath,
   loadChecks,
   manifestPath,
   planCheck,
+  resolveDefaultManifest,
 } from './manifest.js';
+import { LEGACY_MANIFEST_RELATIVE_PATH, MANIFEST_RELATIVE_PATH } from './paths.js';
 
 const DIR = path.resolve('/repo');
 
-/** A reader that returns a fixed body regardless of path. */
+/**
+ * A reader that returns a fixed body for any path except the legacy default
+ * manifest (which it reports absent, so the default path resolves to the current one).
+ */
 function reader(body: string | null): FileReader {
-  return () => body;
+  return (p) => (p === legacyManifestPath(DIR) ? null : body);
+}
+
+/** A reader over an absolute-path map; anything else is absent. */
+function files(map: Record<string, string>): FileReader {
+  return (p) => map[p] ?? null;
 }
 
 describe('planCheck (command planning, mirrors plan_check)', () => {
@@ -69,13 +80,14 @@ describe('planCheck (command planning, mirrors plan_check)', () => {
 });
 
 describe('loadChecks (opt-in-by-presence, mirrors load_checks)', () => {
-  test('reads the manifest at <dir>/.nightcore/harness.json', () => {
-    let seen = '';
+  test('reads the manifest at <dir>/.noctcore/harness.json', () => {
+    const seen: string[] = [];
     loadChecks(DIR, (p) => {
-      seen = p;
+      seen.push(p);
       return null;
     });
-    expect(seen).toBe(manifestPath(DIR));
+    expect(seen[0]).toBe(manifestPath(DIR));
+    expect(manifestPath(DIR)).toBe(path.join(DIR, '.noctcore', 'harness.json'));
   });
 
   test('an absent / unreadable manifest yields no-config (exit 0)', () => {
@@ -183,6 +195,81 @@ describe('loadChecks — an EXPLICIT manifest path is fail-closed (#325)', () =>
 
   test('an empty explicit path falls back to the default manifest', () => {
     const out = loadChecks(DIR, only(manifestPath(DIR), JSON.stringify({ checks: [] })), '');
+    expect(out.kind).toBe('ready');
+  });
+});
+
+describe('the default manifest location and its .nightcore/ fallback', () => {
+  const body = JSON.stringify({ checks: [{ name: 'a', kind: 'k', command: 'x' }] });
+
+  test('the constants name .noctcore/ and the legacy .nightcore/', () => {
+    expect(MANIFEST_RELATIVE_PATH).toBe('.noctcore/harness.json');
+    expect(LEGACY_MANIFEST_RELATIVE_PATH).toBe('.nightcore/harness.json');
+    expect(legacyManifestPath(DIR)).toBe(path.join(DIR, '.nightcore', 'harness.json'));
+  });
+
+  test('new only: reads it and warns about nothing', () => {
+    const warnings: string[] = [];
+    const out = loadChecks(DIR, files({ [manifestPath(DIR)]: body }), undefined, (m) =>
+      warnings.push(m),
+    );
+    expect(out.kind).toBe('ready');
+    expect(warnings).toEqual([]);
+  });
+
+  test('old only: reads it and passes exactly one deprecation warning', () => {
+    const warnings: string[] = [];
+    const out = loadChecks(DIR, files({ [legacyManifestPath(DIR)]: body }), undefined, (m) =>
+      warnings.push(m),
+    );
+    expect(out.kind).toBe('ready');
+    if (out.kind === 'ready') expect(out.checks.map((c) => c.name)).toEqual(['a']);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('.nightcore/harness.json');
+    expect(warnings[0]).toContain('.noctcore/harness.json');
+    expect(warnings[0]).toContain('1.0');
+  });
+
+  test('old only keeps the default posture: a malformed legacy manifest is no-config', () => {
+    const out = loadChecks(DIR, files({ [legacyManifestPath(DIR)]: '{ nope' }));
+    expect(out).toEqual({ kind: 'no-config' });
+  });
+
+  test('both: conflicting-manifests, never a silent pick', () => {
+    const warnings: string[] = [];
+    const out = loadChecks(
+      DIR,
+      files({ [manifestPath(DIR)]: body, [legacyManifestPath(DIR)]: body }),
+      undefined,
+      (m) => warnings.push(m),
+    );
+    expect(out.kind).toBe('conflicting-manifests');
+    if (out.kind === 'conflicting-manifests') {
+      expect(out.message).toContain('.noctcore/harness.json');
+      expect(out.message).toContain('.nightcore/harness.json');
+    }
+    expect(warnings).toEqual([]);
+  });
+
+  test('neither: no-config, as before', () => {
+    expect(loadChecks(DIR, files({}))).toEqual({ kind: 'no-config' });
+    expect(resolveDefaultManifest(DIR, files({}))).toEqual({
+      kind: 'current',
+      path: manifestPath(DIR),
+      raw: null,
+    });
+  });
+
+  test('an explicit path ignores both defaults', () => {
+    const out = loadChecks(
+      DIR,
+      files({
+        [path.resolve(DIR, 'b/harness.json')]: body,
+        [manifestPath(DIR)]: body,
+        [legacyManifestPath(DIR)]: body,
+      }),
+      'b/harness.json',
+    );
     expect(out.kind).toBe('ready');
   });
 });

@@ -23,9 +23,9 @@ const fixtures: string[] = [];
 function fixtureDir(command: string): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'nc-harness-node-'));
   fixtures.push(dir);
-  mkdirSync(path.join(dir, '.nightcore'), { recursive: true });
+  mkdirSync(path.join(dir, '.noctcore'), { recursive: true });
   writeFileSync(
-    path.join(dir, '.nightcore', 'harness.json'),
+    path.join(dir, '.noctcore', 'harness.json'),
     JSON.stringify({ checks: [{ name: 'fixture', kind: 'lint-plugin', command }] }),
     'utf8',
   );
@@ -33,7 +33,7 @@ function fixtureDir(command: string): string {
 }
 
 /**
- * A target dir with a committed lint-meta registry (`.nightcore/lint-meta/registry.js`,
+ * A target dir with a committed lint-meta registry (`.noctcore/lint-meta/registry.js`,
  * CommonJS — the dir has no package.json so `.js` is CJS). `registrySource` is the
  * module body; `strays` are extra sibling files that MUST NOT be imported (bounded
  * eval). Returns the dir.
@@ -41,7 +41,7 @@ function fixtureDir(command: string): string {
 function lintMetaFixture(registrySource: string, strays: Record<string, string> = {}): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'nc-harness-lm-'));
   fixtures.push(dir);
-  const lmDir = path.join(dir, '.nightcore', 'lint-meta');
+  const lmDir = path.join(dir, '.noctcore', 'lint-meta');
   mkdirSync(lmDir, { recursive: true });
   writeFileSync(path.join(lmDir, 'registry.js'), registrySource, 'utf8');
   for (const [name, body] of Object.entries(strays)) {
@@ -318,7 +318,7 @@ describe('the rules subpath runs under plain node', () => {
   test('a registry built from the rule factories loads, runs and reds on a violation', () => {
     const rulesUrl = pathToFileURL(RULES).href;
     const dir = lintMetaFixture('');
-    const lmDir = path.join(dir, '.nightcore', 'lint-meta');
+    const lmDir = path.join(dir, '.noctcore', 'lint-meta');
     rmSync(path.join(lmDir, 'registry.js'));
     writeFileSync(
       path.join(lmDir, 'registry.mjs'),
@@ -340,7 +340,7 @@ export const IDS = rules.RULE_IDS;`,
       '--dir',
       dir,
       '--registry',
-      '.nightcore/lint-meta/registry.mjs',
+      '.noctcore/lint-meta/registry.mjs',
     ]);
     expect(res.status).toBe(1);
     expect(res.stderr).toContain('[ERROR] lockfile-registry-resolutions (pnpm-lock.yaml):');
@@ -373,8 +373,8 @@ describe('async rules and the catalog run under plain node (#277, #278)', () => 
   test('catalog writes RULES.md beside the registry, and --check then passes', () => {
     const dir = lintMetaFixture(ASYNC_REGISTRY);
     expect(runNode(['catalog', '--dir', dir]).status).toBe(0);
-    const catalog = readFileSync(path.join(dir, '.nightcore', 'lint-meta', 'RULES.md'), 'utf8');
-    expect(catalog).toContain('from `.nightcore/lint-meta/registry.js`. 2 rules, 1 CI-critical.');
+    const catalog = readFileSync(path.join(dir, '.noctcore', 'lint-meta', 'RULES.md'), 'utf8');
+    expect(catalog).toContain('from `.noctcore/lint-meta/registry.js`. 2 rules, 1 CI-critical.');
     expect(catalog).toContain('| `async-no-todo` | config   | **yes**     |');
     expect(runNode(['catalog', '--check', '--dir', dir]).status).toBe(0);
   });
@@ -383,7 +383,7 @@ describe('async rules and the catalog run under plain node (#277, #278)', () => 
     const dir = lintMetaFixture(ASYNC_REGISTRY);
     expect(runNode(['catalog', '--dir', dir, '--out', 'docs/RULES.md']).status).toBe(0);
     writeFileSync(
-      path.join(dir, '.nightcore', 'lint-meta', 'registry.js'),
+      path.join(dir, '.noctcore', 'lint-meta', 'registry.js'),
       ASYNC_REGISTRY.replace('ciCritical: true,', ''),
       'utf8',
     );
