@@ -9,3 +9,5 @@ bun.lock
 **/*.md
 # Fixture repos are inputs to the tests, byte for byte.
 packages/*/fixtures
+# The docs site has its own Astro tooling.
+site

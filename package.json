@@ -7,10 +7,13 @@
     "node": ">=22"
   },
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "site"
   ],
   "scripts": {
     "build": "bun run --filter './packages/*' build",
+    "docs:dev": "bun run --filter '@noctcore/harness-docs' dev",
+    "docs:build": "bun run --filter '@noctcore/harness-docs' docs:build",
     "typecheck": "bun run --filter './packages/*' check-types && tsc -p scripts",
     "test": "bun run --filter './packages/*' test",
     "test:coverage": "bun run --filter './packages/*' test:coverage",

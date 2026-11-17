@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "types": ["node"],
+    "paths": {
+      "@noctcore/harness": ["../../packages/harness/src/index.ts"],
+      "@noctcore/harness/rules": ["../../packages/harness/src/rules.ts"],
+      "@noctcore/harness/pinned-tools": ["../../packages/harness/src/pinned-tools.ts"]
+    }
+  },
+  "include": ["entries", "../../packages/harness/src"],
+  "exclude": ["../../packages/harness/src/**/*.test.ts"]
+}
