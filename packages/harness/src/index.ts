@@ -26,6 +26,11 @@ export {
   loadBaseline,
   serializeBaseline,
 } from './lint-meta/baseline.js';
+// The glob behind the runner's `ctx.glob`, for a repo whose own lint tooling
+// builds its ctx: Node's `fs.globSync` rules under both Node and Bun (whose own
+// `globSync` cannot see a dot-directory), files only, sorted, and throwing on
+// syntax it does not implement instead of matching nothing.
+export { portableFileGlob } from './lint-meta/glob.js';
 
 /** One check as declared in `.nightcore/harness.json`. */
 export interface HarnessManifestCheck {
