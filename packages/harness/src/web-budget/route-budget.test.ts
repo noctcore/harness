@@ -148,6 +148,33 @@ describe('checkRoutes', () => {
     ]);
   });
 
+  test('fails a route whose shell name is only an Object.prototype key, never skipping it', () => {
+    const heavy = parseManifest(
+      JSON.stringify({
+        'index.html': { file: 'assets/index.js', isEntry: true },
+        'src/routes/heavy.tsx': { file: 'assets/heavy.js' },
+      }),
+    );
+    const weighs = (file: string): number => (file === 'assets/heavy.js' ? 1_000_000 : 0);
+    for (const shell of ['toString', 'constructor', 'hasOwnProperty', '__proto__']) {
+      const result = checkRoutes(heavy, weighs, {
+        shells: {},
+        baselines: [
+          { route: '/heavy', sources: ['src/routes/heavy.tsx'], shell, coldKb: 1, beyondKb: 1 },
+        ],
+      });
+      expect(result.problems).toEqual([
+        `/heavy: names the shell ${JSON.stringify(shell)}, which the budget does not define`,
+      ]);
+      const noShells = checkRoutes(heavy, weighs, {
+        baselines: [
+          { route: '/heavy', sources: ['src/routes/heavy.tsx'], shell, coldKb: 1, beyondKb: 1 },
+        ],
+      });
+      expect(noShells.problems).toEqual(result.problems);
+    }
+  });
+
   test('prints the baselines a headroom over today gives, rounded down', () => {
     const { lines } = checkRoutes(GRAPH, sizeOf, budget(), 3);
     expect(lines).toContain('/sign-in: at 3% headroom, cold 164.80 kB and beyond 10.30 kB');

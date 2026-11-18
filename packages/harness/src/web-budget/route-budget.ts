@@ -114,7 +114,7 @@ export function checkRoutes(
     }
     const shell = baseline.shell === undefined ? entryShell : shells.get(baseline.shell);
     if (shell === undefined) {
-      if (budget.shells?.[baseline.shell as string] === undefined) {
+      if (!Object.hasOwn(budget.shells ?? {}, baseline.shell as string)) {
         problems.push(
           `${baseline.route}: names the shell ${JSON.stringify(baseline.shell)}, which the budget does not define`,
         );
