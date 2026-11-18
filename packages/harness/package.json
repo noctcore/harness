@@ -67,13 +67,23 @@
         "types": "./dist/ci.d.cts",
         "default": "./dist/ci.cjs"
       }
+    },
+    "./web-budget": {
+      "import": {
+        "types": "./dist/web-budget.d.ts",
+        "default": "./dist/web-budget.js"
+      },
+      "require": {
+        "types": "./dist/web-budget.d.cts",
+        "default": "./dist/web-budget.cjs"
+      }
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/cli.ts src/index.ts src/rules.ts src/pinned-tools.ts src/ci.ts --format esm,cjs --dts --clean",
+    "build": "tsup src/cli.ts src/index.ts src/rules.ts src/pinned-tools.ts src/ci.ts src/web-budget.ts --format esm,cjs --dts --clean",
     "prepack": "npm run build",
     "check-types": "tsc --noEmit",
     "test": "bun test",

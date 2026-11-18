@@ -1,0 +1,158 @@
+---
+title: Web bundle budgets
+description: Hold a Vite app's shipped bytes to budgets per route and per file set, weighed the way your nginx configuration serves them, catch dynamic imports that split nothing, refuse a stale or mixed build directory, and write and check the brotli copies the server sends.
+---
+
+import { Code } from '@astrojs/starlight/components';
+import webBudget from '../../../../snippets/scripts/web-budget.mts?raw';
+import webPrecompress from '../../../../snippets/scripts/web-precompress.mts?raw';
+
+`@noctcore/harness/web-budget` reads a Vite build through the manifest Vite writes next to it, and
+holds it to the limits your repo commits:
+
+- **Route budgets**: the cold weight of a route (everything a first visit downloads: the shell plus
+  the route) and the weight it adds **beyond the shell**, each held to a baseline.
+- **File budgets**: a ceiling on the summed weight of a file set (`assets/*.js`) or of a route's own
+  chunks, taken from the chunk graph instead of file names.
+- **Dead dynamic imports**: an `import()` whose target is already loaded when it runs, so the split
+  saves nothing.
+- **Served encoding**: every file is weighed the way your nginx configuration sends it: gzip at
+  its level, a precompressed `.br`, or as it is.
+- **Build checks**: no build, a build older than its sources, or a directory that holds two builds
+  is refused before any number is printed.
+- **Precompress**: write the `.br` copies `brotli_static` serves, and check them.
+
+Like every module in the package, the functions are pure over the deps you hand them; the `node*`
+exports do the real file reads.
+
+## What stays in your repo
+
+- the **limits**: the route baselines and the budgets file;
+- the **paths**: the build directory, the manifest path (`.vite/manifest.json` by default), the
+  source roots the build must be newer than;
+- the **web server**: the nginx configuration, the includes and `types` locations it may hold, and
+  the files it rewrites at start or never serves;
+- the script that runs the checks and the CI step that calls it.
+
+## Raising a budget
+
+A baseline or a limit goes up only in a reviewed change that says why: the feature that needs the
+bytes, in the pull request description. The module reads limits and never writes them, and it has
+no tolerance, no override and no environment variable that loosens a check: a budgets entry with an
+option it does not read (`tolerance`, say) is refused. There is no way to raise a budget silently.
+
+`--headroom <percent>` (read with `headroomFromArgv`) only **prints** the limits a percentage over
+today's weight would give, for the person writing that reviewed change. It changes nothing.
+
+## A budget script
+
+<Code code={webBudget.trimEnd()} lang="ts" title="scripts/web-budget.mts" />
+
+`runBudget` prints every line prefixed with the budget's name, each failure as `FAILED ...`, and
+returns `0` or `1`. A build that cannot be loaded, a budget that cannot be read and a configuration
+the model does not know all return `1` with the reason: a check that could not run is a failure.
+
+## The build
+
+`loadWebBuild(options, deps)` refuses, with the reason and your `buildHint`:
+
+| Refused | Why |
+|---|---|
+| no `index.html` (`documentFile`) | there is no build |
+| no manifest (`manifestFile`) | the build was made without `build.manifest` |
+| a source root newer than the document | the build is of another commit (skip with `skipFreshness` under CI, where the build runs right before) |
+| a manifest that is not one | see below |
+| a script the manifest does not list, or a chunk the directory lacks | two builds wrote into the directory |
+| an entry the document does not load | the document is from another build |
+
+The manifest is read defensively, since its shape is Vite's and has changed between majors: it must
+be JSON and an object of entries, every entry needs a string `file` inside the build directory,
+`isEntry`, `imports` and `dynamicImports` are type-checked, a reference to a key the manifest does
+not list is refused (a graph with a hole would report a smaller closure and pass), and a manifest
+with no script chunk is refused. Fields it does not read are ignored. Windows separators read as
+`/`. Only `.js` chunks are in the graph; css is weighed by file budgets.
+
+## Route budgets
+
+`checkRoutes(graph, sizeOf, budget, headroom)` names a route by its **source modules**, as the
+manifest keys them (a query a router plugin adds, `?split=component`, is dropped), and takes its
+chunks from the graph, so a renamed or folded chunk still counts.
+
+| Line | Measures |
+|---|---|
+| `entry` | the static closure of the entry chunks |
+| `<name> shell` | the entry plus a named shell's layout modules (`shells`) and their static imports |
+| cold | the route's shell plus everything the route's chunks import statically beyond it |
+| beyond the shell | the part of the route's closure the shell does not load |
+
+A route or shell the build has no chunk for, a route with one module missing, and a route that names
+a shell the budget does not define are problems, never skips. A baseline that is not a positive
+number throws.
+
+## File budgets
+
+The budgets file is a JSON list:
+
+```json
+[
+  { "name": "every script", "path": "assets/*.js", "limit": "700 kB" },
+  { "name": "every stylesheet", "path": "assets/*.css", "limit": "60 kB" },
+  { "name": "sign-in route", "route": ["src/routes/sign-in.tsx"], "limit": "18 kB" }
+]
+```
+
+A `path` matches files relative to the build directory, and `*` stands for any run of characters
+inside one path segment. A `route` weighs the route's **own chunks** (`ownChunks`): the chunks made
+for its modules, plus every chunk they import that no other load root (the entry, another route, a
+lazy child) imports. Limits are `"<number> kB"` of 1000 bytes. A pattern that matches nothing and a
+route module with no chunk are problems: they would weigh zero bytes under any limit.
+
+## Dead dynamic imports
+
+`checkDynamicImports(graph)` reports every `import()` whose target is loaded before it runs:
+
+| Reason | When |
+|---|---|
+| `same-chunk` | the bundler folded the target into the importing chunk |
+| `static` | the importing chunk reaches the target over static imports |
+| `entry` | the page entry reaches the target over static imports |
+| `loaded-with` | every chunk a browser can fetch that brings the importer brings the target too |
+
+A build with no dynamic import at all fails too, since a check that read none checked nothing; pass
+`requireDynamicImports: false` for an app that splits nothing.
+
+## Served encoding
+
+`parseServedEncoding(conf, options)` reads `gzip`, `gzip_comp_level`, `gzip_min_length`,
+`gzip_types`, `gzip_vary`, `gzip_proxied` and `brotli_static` from the `server` block, with nginx's
+defaults for what is left out. `servedSize(encoding, file, body, request)` then gives the bytes a
+client downloads: the `.br` copy when it accepts br and `brotli_static` is on, else gzip when the
+filter takes the file, else the file as it is. The default request is a browser behind a proxy, so
+under `gzip_proxied off` a budget never weighs gzip a proxied browser does not get.
+
+It fails closed. These throw, each with what to do:
+
+- a compression directive it has no model for (`gzip_static`, `brotli`, `gunzip`, `gzip_buffers`);
+- a compression directive set twice, or set inside a `location`;
+- `gzip_proxied` other than `any` or `off`, which would depend on response headers;
+- an `include` not listed in `allowedIncludes`, or one inside a block or written twice;
+- a `types` block outside the heads listed in `typesLocations`;
+- `brotli_static` in a location other than an exact match set `off`.
+
+Content types come from `mimeTypes` (`css`, `html` and `js` by default); weighing a kind of file it
+has no type for throws. Without nginx, weigh with `weigh: 'gzip' | 'brotli' | 'raw'`.
+
+## Precompress
+
+<Code code={webPrecompress.trimEnd()} lang="ts" title="scripts/web-precompress.mts" />
+
+`precompressDir` removes every `.br` first, then writes one per eligible file, so a copy can never
+outlive or predate its file. A file gets a copy when its extension is in `types` (text kinds by
+default), it is not in `never`, it is at least `minLength` bytes (20, nginx's default), and brotli
+at quality 11 makes it smaller. `checkPrecompressed` writes nothing: it fails on a missing copy, a
+copy that does not decode to its file, a copy whose file is gone or gets none, and a directory where
+nothing gets a copy.
+
+## API
+
+The full signatures are in the [API reference](/harness/reference/api/noctcore/harness/web-budget/).

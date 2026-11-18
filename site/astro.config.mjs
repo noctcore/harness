@@ -74,6 +74,7 @@ export default defineConfig({
             './typedoc/entries/rules.ts',
             './typedoc/entries/pinned-tools.ts',
             './typedoc/entries/ci.ts',
+            './typedoc/entries/web-budget.ts',
           ],
           tsconfig: './typedoc/tsconfig.json',
           output: 'reference/api',
@@ -98,6 +99,7 @@ export default defineConfig({
               link: '/guides/hadolint-squawk-trivy/',
             },
             { label: 'CI helpers', link: '/guides/ci-helpers/' },
+            { label: 'Web bundle budgets', link: '/guides/web-budget/' },
           ],
         },
         {
