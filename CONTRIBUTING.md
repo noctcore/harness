@@ -25,8 +25,8 @@ lint-meta/              the rule contract, the registry loader, the run loop, ba
 rules.ts, rules/        the @noctcore/harness/rules subpath: one file per rule factory
 pinned-tools.ts,        the @noctcore/harness/pinned-tools subpath: pins, routes, gitleaks,
   pinned-tools/         fetching and placing binaries, and the node-backed deps
-web-budget.ts,          the @noctcore/harness/web-budget subpath: manifest reader, build graph,
-  web-budget/           budgets, dead imports, report and precompress check
+web-budget.ts,          the @noctcore/harness/web-budget subpath: manifest and chunk graph,
+  web-budget/           route and file budgets, dead imports, nginx model, precompress
 index.ts                the public type barrel plus the ratchet helpers and portableFileGlob
 ```
 

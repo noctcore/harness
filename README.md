@@ -92,7 +92,7 @@ directories hold the same file. The fallback goes away in 1.0
 | `@noctcore/harness/rules` | Six ready-made lint-meta rules as factories: `lockfile-registry-resolutions`, `single-version-dependencies`, `only-built-dependencies-have-scripts`, `pnpm-patch-ledger`, `github-actions-secret-no-install` and `github-actions-security-no-cancel`. |
 | `@noctcore/harness/pinned-tools` | Runs zizmor, actionlint, gitleaks, hadolint, squawk and trivy at exactly their pinned version (native, else the image by digest, else blocked with exit 2), and installs the pinned linux binaries in CI after a sha256 check. |
 | `@noctcore/harness/ci` | CI helpers: the base commit a run diffs against (the last green push run, else a full run), the commit range commitlint reads with an exemption list by sha, and a due-date check over dated ledgers for a scheduled job. |
-| `@noctcore/harness/web-budget` | Web bundle budgets for a Vite build: cold and beyond-the-shell weight per route, shell and per-file limits, dead dynamic imports, a committed report with a freshness check, and a check that every file the server serves compressed has its `.br`/`.gz` sibling. Nothing in it raises a budget. |
+| `@noctcore/harness/web-budget` | Web bundle budgets for a Vite build: route baselines (cold and beyond the shell) and file budgets weighed the way an nginx configuration serves each file, dead dynamic imports, refusal of a stale or mixed build directory, and the brotli copies `brotli_static` serves. Nothing in it raises a budget. |
 
 A registry is a module that exports `META_RULES`. The ready-made rules sit next to your own:
 

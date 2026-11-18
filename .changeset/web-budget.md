@@ -4,12 +4,13 @@
 
 Add the `@noctcore/harness/web-budget` subpath: web bundle budgets for a Vite build, as pure functions over injected file reads.
 
-- `parseViteManifest`, `parseViteManifestText` and `readViteManifest` read the Vite manifest defensively: a wrong field type, an entry without `file`, an empty or missing manifest, or a path outside the build directory is a named problem that fails the check; unknown fields are ignored.
-- `buildGraph` weighs each route cold (its static closure) and beyond the shell (minus what the entry chunks load), counting a shared file once and surviving import cycles.
-- `checkBudgets` holds the shell, each route (`cold`, `beyondShell`) and each built file matching a glob to the budgets your repo commits; a stale route key or pattern and an invalid budget fail.
-- `findDeadImports` reports `import()` calls whose target is already loaded or missing; each allowed one needs a written reason.
-- `checkWebBudget` runs everything and renders a deterministic Markdown report; `reportIsFresh` fails a committed report that no longer matches the build (CRLF equals LF).
-- `checkPrecompressed` checks that every file the server serves compressed has a non-empty, fresh `.br` and `.gz` sibling; the directory, extensions, `minBytes` and encodings are options.
-- `nodeManifestDeps`, `nodeReadText`, `nodeSizeOf` (raw, gzip or brotli) and `nodePrecompressDeps` are the real I/O.
+- `parseManifest` reads the Vite manifest defensively into a graph of script chunks: text that is not JSON, an entry without a `file`, a wrong field type, a path outside the build directory, a reference to an unlisted key and a manifest with no script chunk all throw; unknown fields are ignored.
+- `loadWebBuild` refuses a missing build, a missing manifest, a build older than its `sourceRoots` (skippable under CI) and a directory two builds wrote into, then weighs each file as served.
+- `checkRoutes` holds each route's cold weight (its shell plus the route) and its weight beyond the shell to baselines, with named shells for layout routes.
+- `parseFileBudgets` and `checkFileBudgets` hold file patterns and a route's own chunks (`ownChunks`, taken from the graph) to `"<n> kB"` limits; a pattern or route that names nothing fails.
+- `checkDynamicImports` reports `import()` calls that split nothing (`same-chunk`, `static`, `entry`, `loaded-with`), and fails a build that lists none unless told the app splits nothing.
+- `parseServedEncoding` and `servedSize` weigh a file the way an nginx configuration sends it (gzip level, length floor, types, `gzip_proxied`, `brotli_static`), failing closed on anything the model cannot read; includes and `types` locations it may accept are options.
+- `precompressDir` writes the `.br` copies `brotli_static` serves (old copies removed first), and `checkPrecompressed` checks them.
+- `runBudget` and `headroomFromArgv` run a budget script with prefixed output and an exit code; headroom only prints limits.
 
-Nothing in the module writes or raises a budget. Nothing that already shipped changes behavior.
+Nothing in the module writes or raises a limit, and it has no tolerance or override. Nothing that already shipped changes behavior.

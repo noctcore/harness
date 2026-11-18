@@ -1,38 +1,53 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 
 import {
-  checkWebBudget,
-  formatWebBudgetSummary,
-  nodeManifestDeps,
-  nodeReadText,
-  nodeSizeOf,
-  readViteManifest,
-  reportIsFresh,
+  checkDynamicImports,
+  checkFileBudgets,
+  checkRoutes,
+  headroomFromArgv,
+  type IRouteBudget,
+  loadWebBuild,
+  nodeWebBuildDeps,
+  parseFileBudgets,
+  parseServedEncoding,
+  runBudget,
 } from '@noctcore/harness/web-budget';
 
-// Your paths: the build output, its manifest, your budgets file and the committed report.
-const DIST = 'apps/web/dist';
-const REPORT = 'apps/web/BUDGETS.md';
-
-const result = checkWebBudget({
-  manifest: readViteManifest(`${DIST}/.vite/manifest.json`, nodeManifestDeps),
-  sizeOf: nodeSizeOf(DIST, 'gzip'),
-  budgets: JSON.parse(readFileSync('apps/web/budgets.json', 'utf8')),
-  allowDeadImports: [
-    { importer: 'src/main.tsx', target: 'src/devtools.tsx', reason: 'loaded in dev builds only' },
+// Your paths and limits. Moving a baseline or a limit is a reviewed edit with a reason.
+const ROUTES: IRouteBudget = {
+  shells: { app: ['src/routes/_app.tsx'] },
+  baselines: [
+    { route: '/sign-in', sources: ['src/routes/sign-in.tsx'], coldKb: 160, beyondKb: 12 },
+    { route: '/reports', sources: ['src/routes/_app/reports.tsx'], shell: 'app', coldKb: 240, beyondKb: 35 },
   ],
-});
+};
+const budgets = parseFileBudgets(readFileSync('apps/web/budgets.json', 'utf8'));
+const encoding = parseServedEncoding(readFileSync('apps/web/nginx.conf', 'utf8'));
+const headroom = headroomFromArgv(process.argv.slice(2));
 
-if (process.argv.includes('--report')) {
-  // Writes the report, never the budgets: a budget changes only by hand, with a reason.
-  writeFileSync(REPORT, result.report);
-  process.exit(0);
-}
-
-console.log(formatWebBudgetSummary(result).join('\n'));
-const freshness = reportIsFresh(nodeReadText(REPORT), result.report, {
-  path: REPORT,
-  regenerate: 'node scripts/web-budget.mts --report',
-});
-if (!freshness.fresh) console.error(freshness.message);
-process.exit(result.passed && freshness.fresh ? 0 : 1);
+const code = runBudget(
+  'web-budget',
+  { out: console.log, err: console.error },
+  () =>
+    loadWebBuild(
+      {
+        distDir: 'apps/web/dist',
+        sourceRoots: ['apps/web/src', 'packages/ui/src'],
+        skipFreshness: process.env.CI === 'true',
+        weigh: { encoding, precompress: { never: ['runtime.js'] } },
+      },
+      nodeWebBuildDeps,
+    ),
+  (build) => {
+    const reports = [
+      checkRoutes(build.graph, build.sizeOf, ROUTES, headroom),
+      checkFileBudgets(budgets, build.assets, build.graph, build.sizeOf, headroom),
+      checkDynamicImports(build.graph),
+    ];
+    return {
+      lines: reports.flatMap((report) => report.lines),
+      problems: reports.flatMap((report) => report.problems),
+    };
+  },
+);
+process.exit(code);
