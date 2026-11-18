@@ -93,6 +93,12 @@ port of the in-process Rust runner in `apps/desktop/src-tauri/src/workflow/gaunt
   deps; `node.ts` holds the real ones. The default pins (`pins.ts`) are public API: moving one is a
   minor release. No network call here either: `nodeFetchDeps` takes `download` from the caller, and
   `cli.node.test.ts` scans the built entrypoint for `fetch(`.
+- `src/ci.ts` + `src/ci/`: the `@noctcore/harness/ci` subpath. The affected base a CI run diffs
+  against (`affected-base.ts`), the commitlint range and exemption plan (`commit-range.ts`,
+  `commitlint.ts`), and the due-date check over dated ledgers (`due-dates.ts`, which reads trivy
+  ignores through `pinned-tools/trivy.ts`). Pure over injected deps; `git.ts` holds the real ones.
+  No network call: the caller does the GitHub lookup and passes the result in. Workflows, job
+  names, exempt shas and ledger paths are the consumer's, never literals here.
 - `src/index.ts` — the public type barrel (manifest + result shapes) PLUS the portable lint-meta
   contract (`IMetaRule` / `IMetaCtx` / `IViolation`) + the ratchet helpers a generated rule imports.
 

@@ -57,13 +57,23 @@
         "types": "./dist/pinned-tools.d.cts",
         "default": "./dist/pinned-tools.cjs"
       }
+    },
+    "./ci": {
+      "import": {
+        "types": "./dist/ci.d.ts",
+        "default": "./dist/ci.js"
+      },
+      "require": {
+        "types": "./dist/ci.d.cts",
+        "default": "./dist/ci.cjs"
+      }
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/cli.ts src/index.ts src/rules.ts src/pinned-tools.ts --format esm,cjs --dts --clean",
+    "build": "tsup src/cli.ts src/index.ts src/rules.ts src/pinned-tools.ts src/ci.ts --format esm,cjs --dts --clean",
     "prepack": "npm run build",
     "check-types": "tsc --noEmit",
     "test": "bun test",

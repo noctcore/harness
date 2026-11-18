@@ -73,6 +73,7 @@ export default defineConfig({
             './typedoc/entries/harness.ts',
             './typedoc/entries/rules.ts',
             './typedoc/entries/pinned-tools.ts',
+            './typedoc/entries/ci.ts',
           ],
           tsconfig: './typedoc/tsconfig.json',
           output: 'reference/api',
@@ -96,6 +97,7 @@ export default defineConfig({
               label: 'Dockerfiles, migrations and images',
               link: '/guides/hadolint-squawk-trivy/',
             },
+            { label: 'CI helpers', link: '/guides/ci-helpers/' },
           ],
         },
         {
