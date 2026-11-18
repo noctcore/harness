@@ -24,7 +24,7 @@
     },
     "packages/harness": {
       "name": "@noctcore/harness",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "bin": {
         "harness": "./dist/cli.js",
       },
