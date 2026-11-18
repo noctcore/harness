@@ -511,9 +511,26 @@ export function preflight(
   return null;
 }
 
+/**
+ * Each line break, with the whitespace around it, as one space. A linear
+ * split rather than a `\s*\n\s*` regex, whose backtracking is polynomial on a
+ * long run of spaces.
+ */
+function oneLine(text: string): string {
+  const parts = text.split('\n');
+  const last = parts.length - 1;
+  return parts
+    .map((part, index) => {
+      const start = index === 0 ? part : part.trimStart();
+      return index === last ? start : start.trimEnd();
+    })
+    .filter((part, index) => index === 0 || index === last || part !== '')
+    .join(' ');
+}
+
 /** `<checkId>: <status> (<reason>)`, on one line. */
 export function verdictLine(checkId: string, verdict: IMutationVerdict): string {
-  return `${checkId}: ${verdict.status} (${verdict.reason.replace(/\s*\n\s*/gu, ' ')})`;
+  return `${checkId}: ${verdict.status} (${oneLine(verdict.reason)})`;
 }
 
 /** 0 for passed, 1 for failed, 2 for blocked. */

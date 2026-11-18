@@ -441,6 +441,25 @@ describe('preflight', () => {
   });
 });
 
+describe('verdictLine: line breaks', () => {
+  it('turns each line break and the whitespace around it into one space', () => {
+    const line = (reason: string): string => verdictLine('m', { status: 'failed', reason });
+    assert.equal(line('a\n  b'), 'm: failed (a b)');
+    assert.equal(line('a  \r\n  b'), 'm: failed (a b)');
+    assert.equal(line('a\n\n  \nb'), 'm: failed (a b)');
+    assert.equal(line('\nb'), 'm: failed ( b)');
+    assert.equal(line('a\n'), 'm: failed (a )');
+    assert.equal(line('\n\n'), 'm: failed ( )');
+    assert.equal(line('  lead and trail  '), 'm: failed (  lead and trail  )');
+  });
+
+  it('stays fast on a long run of spaces', () => {
+    const started = performance.now();
+    verdictLine('m', { status: 'failed', reason: `a${' '.repeat(100_000)}b\n` });
+    assert.ok(performance.now() - started < 1000);
+  });
+});
+
 describe('verdictLine and exitCodeFor', () => {
   it('prints the line verify reads, on one line', () => {
     assert.equal(
