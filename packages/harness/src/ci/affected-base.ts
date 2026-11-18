@@ -79,14 +79,22 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** `root` without leading or trailing `/`. A linear scan: a regex here is polynomial on many slashes. */
 function trimSlashes(root: string): string {
-  return root.replace(/^\/+|\/+$/gu, '');
+  let start = 0;
+  let end = root.length;
+  while (start < end && root[start] === '/') start += 1;
+  while (end > start && root[end - 1] === '/') end -= 1;
+  return root.slice(start, end);
 }
 
 /** The workspace folder (`<root>/<name>`) a path sits in, if it is under one of the roots. */
 function workspaceFolder(path: string, roots: readonly string[]): string | undefined {
   for (const root of roots) {
-    const prefix = `${trimSlashes(root)}/`;
+    const name = trimSlashes(root);
+    // An empty root (`''`, `/`) names no folder, so nothing sits under it.
+    if (name === '') continue;
+    const prefix = `${name}/`;
     if (!path.startsWith(prefix)) continue;
     const rest = path.slice(prefix.length);
     const slash = rest.indexOf('/');

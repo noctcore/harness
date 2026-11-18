@@ -212,6 +212,16 @@ describe('outsideWorkspaces', () => {
     expect(seen).toEqual(['libs/a', 'tools/b']);
   });
 
+  test('a root of slashes alone matches nothing, and a long run of slashes stays fast', () => {
+    expect(
+      outsideWorkspaces(['/x/y.ts', 'x/y.ts'], () => true, { workspaceRoots: ['///'] }),
+    ).toEqual(['/x/y.ts', 'x/y.ts']);
+    const slashes = `${'/'.repeat(100_000)}x`;
+    const started = performance.now();
+    outsideWorkspaces(['libs/a/x.ts'], () => true, { workspaceRoots: [slashes] });
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+
   test('custom roots are named in the full-run reason', () => {
     const decision = affectedBaseFrom(
       { kind: 'affected', base: GREEN, reason: 'x' },
