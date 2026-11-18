@@ -163,7 +163,7 @@ export function readHadolintConfig(
       }
       return;
     }
-    const pair = /^([A-Za-z-]+):\s*(.*)$/u.exec(line);
+    const pair = /^([A-Za-z-]+):(.*)$/u.exec(line);
     const key = pair?.[1];
     if (pair === null || key === undefined) {
       problems.push(`${where}: not a line this check can read (${raw.trim()})`);
@@ -178,7 +178,7 @@ export function readHadolintConfig(
       problems.push(`${where}: ${key} is written twice, and YAML keeps only the last`);
     }
     seen.add(key);
-    const value = pair[2] ?? '';
+    const value = (pair[2] ?? '').trimStart();
     list = value === '' ? key : null;
     if (LIST_KEYS.has(key) && value !== '') {
       problems.push(`${where}: ${key} must be a block list, one item per line`);

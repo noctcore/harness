@@ -125,8 +125,9 @@ export function nodeCapturedDeps(options: INodeRunOptions = {}): ICapturedRunDep
 /** The text of a repo-relative file (`/` separators) under `root`, or null when there is none. */
 export function readRepoFile(root: string, file: string): string | null {
   const path = join(root, ...file.split('/'));
+  // Read, never stat then read: a directory or a missing file throws, and is null.
   try {
-    return statSync(path).isFile() ? readFileSync(path, 'utf8') : null;
+    return readFileSync(path, 'utf8');
   } catch {
     return null;
   }
