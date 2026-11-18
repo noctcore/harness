@@ -117,12 +117,15 @@ process.exit(exitCodeFor(result.status)); // 0 passed, 1 failed, 2 blocked
 
 | Export | What it does |
 |---|---|
-| `ZIZMOR`, `ACTIONLINT`, `SHELLCHECK`, `WORKFLOW_LINTERS`, `WORKFLOW_LINTER_TOOLS` | The default pins: version, image by digest, linux assets by sha256. |
+| `ZIZMOR`, `ACTIONLINT`, `SHELLCHECK`, `WORKFLOW_LINTERS`, `WORKFLOW_LINTER_TOOLS`, `HADOLINT`, `SQUAWK`, `TRIVY` | The default pins: version, image by digest, linux assets by sha256. |
 | `runLinter(pin, root, deps)` | Lint `.github/workflows` with a workflow linter, by the route above. |
 | `runGitleaks(version, root, deps, options)` | A full-history gitleaks scan at the version CI installs (`pinnedGitleaksVersion` reads it from a workflow), else `GITLEAKS_IMAGE` when its tag names that version. A worktree, whose `.git` the image cannot follow, needs the native binary. |
+| `runHadolint(root, deps, options)` | hadolint over every Dockerfile git tracks, plus the repo's canaries: the configuration is read strictly first (`failure-threshold: style`, pragmas off, every ignored rule with a reason), and a `# hadolint` pragma in a Dockerfile fails before hadolint runs. |
+| `runSquawk(root, deps, options)` | squawk over every migration outside a sealed baseline (a ratchet by design), plus the repo's canaries. Squawk directives, bare carriage returns and `standard_conforming_strings` fail before squawk runs; `inspect` adds the repo's own checks of a migration's text. |
+| `scanImages(images, deps, options)` | trivy over `docker save` tarballs for advisories at or above a severity floor that have a fix, and for secrets, after an SBOM canary and a secret canary. `readTrivyIgnoreFile` holds every ignore to a statement and an expiry. |
 | `fetchPinned(tools, arch, dir, deps)` | Install pinned linux assets after checking each sha256, then require the pinned version. |
 | `placeBinary(bytes, name, dir, token)` | Put a binary in place through a staged file and a rename, so an existing symlink is replaced, never written through. |
-| `nodeRunDeps({ docker })`, `nodeGitleaksDeps(root)`, `nodeFetchDeps({ download })` | The real I/O for the functions above. `docker` (also accepted by `nodeGitleaksDeps(root, { docker })`) names another container CLI for every call: the probes, the pull and the run (default `docker`). |
+| `nodeRunDeps({ docker })`, `nodeGitleaksDeps(root)`, `nodeHadolintDeps()`, `nodeSquawkDeps()`, `nodeTrivyScanDeps()`, `nodeFetchDeps({ download })` | The real I/O for the functions above. `docker` (also accepted by `nodeGitleaksDeps(root, { docker })`) names another container CLI for every call: the probes, the pull and the run (default `docker`); the hadolint, squawk and trivy deps take it too. |
 
 Every function takes its I/O as deps, so a repo tests its own wiring without spawning anything. A
 repo that needs another version passes its own pin; moving a default pin is a minor release. Like

@@ -1,0 +1,127 @@
+---
+title: Dockerfiles, migrations and images
+description: Run hadolint, squawk and trivy at exactly their pinned version, with a strict read of each tool's configuration, canaries that fail the day a tool stops judging, and no inline escape.
+---
+
+import { Code } from '@astrojs/starlight/components';
+import hadolint from '../../../../snippets/scripts/hadolint.mts?raw';
+import squawk from '../../../../snippets/scripts/squawk.mts?raw';
+import squawkBaseline from '../../../../snippets/scripts/squawk-baseline.mts?raw';
+import trivy from '../../../../snippets/scripts/trivy.mts?raw';
+
+Three more tools run the way the [workflow linters](/harness/guides/pinned-tools/) do: native at
+exactly the pinned version, else the image by digest, else **blocked** (exit 2). Each one also
+guards against the ways a green run can lie:
+
+- **The configuration is read first, strictly.** A key the tool would honour and the check does not
+  know fails, so a setting cannot quietly change what is judged.
+- **No inline escape.** A `# hadolint` pragma in a Dockerfile, or a `squawk-ignore` comment in a
+  migration, fails before the tool runs. A rule is turned off for every file, in the configuration,
+  with its reason.
+- **Canaries.** Every run also lints fixtures the repo commits, each with the exact codes the pinned
+  tool must report for it, no more and no fewer. A pin, a database or a configuration change that
+  stopped the tool judging fails the run on the day it happens, not on the day a real file needed
+  it.
+
+| Tool | Default pin | Image platform |
+|---|---|---|
+| `HADOLINT` | 2.15.1 | linux/amd64 and linux/arm64 |
+| `SQUAWK` | 2.67.0 | linux/amd64 only (the pull and the run name it) |
+| `TRIVY` | 0.75.0 | linux/amd64 and linux/arm64 |
+
+Each pin carries the linux release assets with their sha256, so `fetchPinned([HADOLINT, SQUAWK,
+TRIVY], arch, dir, deps)` installs them in CI like the others. A repo that keeps its own version
+passes `pin` in the options; the version is then the repo's call, and a default moving here never
+changes its rule set.
+
+## hadolint over every tracked Dockerfile
+
+<Code code={hadolint.trimEnd()} lang="ts" title="scripts/hadolint.mts" />
+
+```
+hadolint: passed (4 Dockerfiles clean, 2 canaries judged as pinned, native)
+```
+
+- **What is linted**: every `Dockerfile`, `x.Dockerfile` and `Dockerfile.x` git tracks (`git ls-files`),
+  minus the `exclude` prefixes and the canaries. No Dockerfile at all **fails**.
+- **The configuration** (`.hadolint.yaml`, or `configFile`) must set `failure-threshold: style`
+  (every finding fails, at any level), `disable-ignore-pragma: true` and at least one
+  `trustedRegistries` entry. Every rule in `ignored` needs a reason after a `#`. A list written
+  inline (`ignored: [DL3008]`) fails: hadolint applies it, but the check could not see its reasons.
+- **The run** is `hadolint --config <file> --format json --no-color <files>`, the same on both
+  routes; the image runs with `--network none` and the repo mounted read-only.
+- **Canaries** that expect a code the configuration ignores fail too: one of the two is wrong.
+
+## squawk over every migration outside the baseline
+
+<Code code={squawk.trimEnd()} lang="ts" title="scripts/squawk.mts" />
+
+```
+squawk: passed (1 migration outside the baseline clean, 12 baselined, 2 canaries judged as pinned, native)
+```
+
+- **What is linted**: every folder under `migrationsDir` holding a `migration.sql` (or
+  `migrationFile`), except the ones the baseline pins. A missing directory **fails**, and so does a
+  folder with no migration file, or one that is a symbolic link (a migration tool would follow it).
+- **Before squawk runs**, a linted migration fails on a squawk directive, a carriage return that is
+  not part of a line ending (Postgres ends a `--` comment there and runs what follows), or
+  `standard_conforming_strings` (with it off, where a string ends depends on the session). `inspect`
+  adds the repo's own checks of the text, for example a search for DDL inside `DO` bodies, which
+  squawk reads as strings.
+- **The configuration** (`.squawk.toml`) is read as the TOML subset squawk uses. It must set exactly
+  `pg_version`, `assume_in_transaction` and `excluded_rules` (or `configKeys`); a key squawk would
+  ignore, a quoted or dotted key, a table, or a key set twice fails. Nothing on the command line
+  decides a rule: `--exclude` or `--pg-version` would replace what the file says.
+
+### The baseline is a ratchet
+
+This is the one module that is a ratchet by design. The migrations that existed when the check
+arrived are already applied and cannot be edited, so a finding in one could only be read, never
+fixed. They are pinned by the sha256 of their file (line endings read as LF) and never linted:
+
+<Code code={squawkBaseline.trimEnd()} lang="ts" title="scripts/squawk-baseline.mts" />
+
+- What is exempt is the **content**, not the name: a pinned file whose hash changed fails, so
+  nothing appended to one goes unlinted.
+- The set only **loses** members. A pinned migration whose folder is deleted moves, with its hash,
+  to the retired list; a pinned name with no folder fails, because a new migration reusing it would
+  skip the lint.
+- `baselineSeal(pinned, retired)` is the sha256 of every `name sha256` line of both lists, sorted. A
+  move between the two keeps it; an addition or an edited hash breaks it, and the run fails.
+- The seal sits beside the list it seals. A list changed **together with** a recomputed seal passes:
+  that is a reviewer's to catch. The seal makes the change evident, not impossible, so every change
+  to the baseline file needs a second reader.
+
+## trivy over images
+
+<Code code={trivy.trimEnd()} lang="ts" title="scripts/trivy.mts" />
+
+`scanImages` finds trivy, scans both canaries, then `docker save`s each image into the work
+directory and scans the tarball. No Docker socket is ever mounted into a container.
+
+- **What fails**: every secret, and every advisory at or above `severityFloor` (HIGH and CRITICAL)
+  that has a fix (`--ignore-unfixed`). An image whose OS trivy could not tell, or whose OS packages
+  it judged none of, fails too: zero OS findings would prove nothing.
+- **The verdict depends on the day.** The pin fixes trivy's code, not its database, which every run
+  downloads. An image that passed yesterday fails today when an advisory is published for something
+  it ships. That is the point.
+- **The ignore file** (`.trivyignore.yaml`) is read by a strict subset of YAML and must be exactly
+  the canonical rendering of what was read (`renderTrivyIgnoreFile`). Every entry needs a statement
+  and an `expired_at` at most `maxIgnoreDays` (14) ahead and not past: an ignore is a deadline.
+- **Canaries**: a CycloneDX SBOM the repo commits, naming a package with a known advisory
+  (`sbomCanary`), and a token in the github-pat shape made up for each run. Both must be reported.
+- **Nothing configures trivy behind the check's back**: every scan names two empty config files the
+  run writes, and a native scan gets an environment without `TRIVY_*` variables.
+- **Blocked, not failed**: a database or registry that could not be reached, a pull that failed for
+  want of the network (`classifyPullFailure` decides otherwise), and docker's own exit 125.
+
+`scanImages` builds nothing and removes nothing but its tarballs: the caller builds the images,
+owns the work directory, and, to remove containers on an interrupt, passes a `containerName` that
+records each name before the container starts.
+
+## Testing your wiring
+
+Each runner takes its I/O as deps (`IHadolintDeps`, `ISquawkDeps`, `ITrivyScanDeps`), and
+`nodeHadolintDeps`, `nodeSquawkDeps` and `nodeTrivyScanDeps` are the real ones. A repo keeps a few
+tests that hand its own configuration and canaries to the runner with a stand-in tool, so a change
+to either is a failing case before it is a red CI run.

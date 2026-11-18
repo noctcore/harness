@@ -90,7 +90,7 @@ directories hold the same file. The fallback goes away in 1.0
 | `harness catalog` | Writes a Markdown table of the registry's rules; `--check` fails when the committed one is stale. |
 | `@noctcore/harness` | The manifest and result types, the lint-meta contract (`IMetaRule`, `IMetaCtx`, `IViolation`), the ratchet helpers (`loadBaseline`, `isGrandfathered`, `serializeBaseline`) and `portableFileGlob`. |
 | `@noctcore/harness/rules` | Six ready-made lint-meta rules as factories: `lockfile-registry-resolutions`, `single-version-dependencies`, `only-built-dependencies-have-scripts`, `pnpm-patch-ledger`, `github-actions-secret-no-install` and `github-actions-security-no-cancel`. |
-| `@noctcore/harness/pinned-tools` | Runs zizmor, actionlint and gitleaks at exactly their pinned version (native, else the image by digest, else blocked with exit 2), and installs the pinned linux binaries in CI after a sha256 check. |
+| `@noctcore/harness/pinned-tools` | Runs zizmor, actionlint, gitleaks, hadolint, squawk and trivy at exactly their pinned version (native, else the image by digest, else blocked with exit 2), and installs the pinned linux binaries in CI after a sha256 check. |
 
 A registry is a module that exports `META_RULES`. The ready-made rules sit next to your own:
 
