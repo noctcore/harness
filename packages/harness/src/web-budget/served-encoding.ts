@@ -7,7 +7,7 @@
  *
  * It fails closed: a directive it has no model for is an error, never a
  * default. A consumer that does not serve through nginx weighs files with
- * `nodeSizeOf` instead.
+ * `loadWebBuild`'s `weigh: 'raw' | 'gzip' | 'brotli'` (`measuredSize`) instead.
  */
 import { gzipSync } from 'node:zlib';
 
