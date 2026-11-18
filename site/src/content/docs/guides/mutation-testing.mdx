@@ -1,0 +1,196 @@
+---
+title: Mutation testing
+description: Hold a package's tests to a mutation score that may only rise, fail any surviving mutant on the lines a branch changed, and accept an equivalent mutant only through a dated, reviewed ledger entry.
+---
+
+import { Code } from '@astrojs/starlight/components';
+import mutation from '../../../../snippets/scripts/mutation.mts?raw';
+
+`@noctcore/harness-mutation` turns a [Stryker](https://stryker-mutator.io/) run into a gate. Coverage
+says a line ran; a mutation score says a test would notice if the line were wrong. The package
+decides what a run proved and leaves running it to Stryker:
+
+- **The score ratchet**: a committed baseline per package that may only rise. A drop past the
+  tolerance fails, and so does a rise past the margin, until the gain is recorded.
+- **Changed lines**: mutate only the lines a branch changed since its merge base, and fail any
+  mutant on them that no test kills, by name.
+- **The ledger**: the one way to let a mutant through. Each entry names one mutant, says why no
+  test can kill it, and carries a review date; it fails once that date has passed.
+- **The verdict**: `passed`, `failed` or `blocked`, with a reason. A run that crashed, wrote no
+  report, left mutants unrun or could not start is never read as a pass.
+
+Like every module in the harness, the functions are pure over the deps you hand them.
+`nodeMutationDeps(root)` holds the real file, git and spawn I/O; your tests can pass fakes and
+never start Stryker.
+
+## Install
+
+```sh
+bun add -d @noctcore/harness-mutation @stryker-mutator/core
+```
+
+Stryker is a peer dependency (`^10.0.0`), marked optional so the pure functions (the ratchet, the
+ledger, the verdict) work without it. The package never imports Stryker: the runner resolves
+`@stryker-mutator/core/bin/stryker.js` from the target package, the way Stryker resolves its own
+plugins, and spawns it with the Node that runs your script. Install Stryker and its runner plugin
+(`@stryker-mutator/vitest-runner`, `@stryker-mutator/jest-runner`) where the target package can
+resolve them.
+
+## What stays in your repo
+
+The package decides; your repo wires. These stay with you:
+
+- the **target list**: which packages are mutated, their check ids, and which are held to a
+  baseline;
+- each package's `stryker.config.mjs`;
+- the **baseline and ledger JSON files** (`mutation-baseline.json` and `mutation-ledger.json` in the
+  target package by default);
+- the command line or CI step that calls `runMutation`, and the job that runs it.
+
+## Wiring a script
+
+<Code code={mutation.trimEnd()} lang="ts" title="scripts/mutation.mts" />
+
+`runMutation` never throws for a run that went wrong: that is a failed or blocked verdict. Every git
+and Stryker command is printed (through `deps.log`) before it runs. `finishVerdict` gives the lines
+to print and the exit code: `0` passed, `1` failed, `2` blocked. Set `process.exitCode` rather than
+calling `process.exit`: a large captured Stryker output written to a pipe is not delivered yet when
+the write returns, and exiting at once would cut off the verdict line.
+
+## Targets and the Stryker config
+
+```ts
+interface IMutationTarget {
+  dir: string; // the package, repo-relative, `/`-separated
+  checkId: string; // the verdict prefix of a whole-package run
+  ratchet: boolean; // held to the baseline in `dir`; else record-only
+  changedCheckId: string | null; // the verdict prefix of its changed-line run, or none
+}
+```
+
+Stryker runs with the package as its cwd. Before it starts, the runner reads the config and refuses
+one it cannot judge (`preflight`):
+
+| The config must | Else |
+|---|---|
+| Name a `testRunner`. | failed |
+| List that runner's plugin in `plugins` (`@stryker-mutator/vitest-runner` for `vitest`; `command` needs none). An isolated install (pnpm and the like) hides plugins from Stryker's discovery. | failed |
+| Enable the `json` reporter with a `jsonReporter.fileName`: the run is judged from that report. | failed |
+| Point that report strictly inside the report directory (`.noctcore/mutation/` by default, `reportDir` to change it). The runner deletes the report before each run, so it refuses any other path. | failed |
+| Resolve `@stryker-mutator/core` and every listed plugin from the package. | blocked |
+
+## The score ratchet
+
+A whole-package run of a target with `ratchet: true` is judged against `mutation-baseline.json`,
+exactly `{ "score": <percentage> }`. The score judged is the conservative one, timeouts counted as
+undetected, because a loaded machine turns kills into timeouts and Stryker counts a timeout as
+detected.
+
+| Result | Verdict |
+|---|---|
+| Within `dropTolerance` (default 1 point) under the baseline, and within `staleMargin` (default 2 points) over it | passed |
+| More than `dropTolerance` under | failed: the score dropped |
+| More than `staleMargin` over | failed: the baseline is stale, record the gain in this change |
+| No baseline file, or one that cannot be read | blocked |
+
+A run with `accept: true` writes the measured score, and only from a complete run. A dip inside the
+tolerance keeps the old value, so accepting on a busy machine cannot walk the baseline down; a real
+drop is refused unless `allowLowering` is set as well. `acceptHint` is the text a failure prints for
+recording a new baseline (your own command, say).
+
+A run that reused Stryker's incremental results (`incremental: true`) or ran another config
+(`config`) is partial: it passes on a complete run, says it was not judged against the baseline,
+and can never be accepted. A target with `ratchet: false` is record-only: a complete run passes
+whatever its score, and the score goes into the reason.
+
+Besides the ratchet, a whole-package run fails on a report that cannot be a measurement: no mutants,
+mutants never run, every mutant without coverage, no mutant killed although some were covered,
+survivors that ran no test, more timeouts than kills, and any mutant switched off for a reason other
+than being static.
+
+## Changed lines
+
+With `changed: { baseRef }` (default `origin/main`) the run mutates only the lines that differ from
+the merge base of HEAD and `baseRef`, under the target package, plus untracked files:
+
+1. `git merge-base HEAD <baseRef>`, then `git diff -U0` against it and `git ls-files` for tracked
+   and untracked files. A git that cannot start, a missing merge base (a shallow clone: fetch with
+   `fetch-depth: 0`) or a failed listing is blocked.
+2. The changed paths the config's `mutate` patterns select become Stryker ranges
+   (`src/a.ts:12-14`); tests and other unmutated paths are counted and skipped, and so are paths
+   under any prefix in `neverMutate` (none by default).
+3. A run with no changed line of mutated source passes and says it checked nothing.
+4. Otherwise Stryker runs a derived config (no cache, no HTML report) and the report is reconciled
+   with the plan: Stryker must say it instrumented exactly the planned files and mutants.
+
+Any mutant on a changed line that survives (and has no ledger entry) or has no coverage fails, by
+name. A mutant that ran out of time on the clock, or ended in a runtime error, was not judged: the
+run is blocked until a rerun on a quiet machine. A `Stryker disable` comment anywhere in the mutated
+files fails the run: a mutant nobody can kill goes in the ledger with its reason, never in a comment.
+
+What it cannot see is counted in the summary: a hunk that only removes lines, and a mutant that
+spans a changed and an unchanged line (Stryker only generates mutants wholly inside one range).
+
+## The ledger
+
+```json
+{
+  "accepted": [
+    {
+      "file": "src/path/safe-path.ts",
+      "mutator": "EqualityOperator",
+      "source": "for (let index = 0; index < value.length; index += 1) {",
+      "before": "if (value.includes('\\\\')) return false;",
+      "after": "const code = value.charCodeAt(index);",
+      "replacement": "index <= value.length",
+      "reason": "Equivalent: the extra pass reads charCodeAt past the end, which is NaN and passes neither comparison.",
+      "reviewBy": "2027-05-01"
+    }
+  ]
+}
+```
+
+An entry names one surviving mutant by what does not move when lines shift: the file, the mutator,
+the replacement, and the trimmed text of the mutant's line and its nearest non-blank neighbours. It
+needs a `reason` and a `reviewBy` date (YYYY-MM-DD, UTC): the entry holds through that day and every
+run after it fails until somebody re-reads the reason and moves the date, or deletes the entry.
+
+| The ledger | Verdict |
+|---|---|
+| An entry past its `reviewBy` date | failed, before Stryker starts |
+| An unknown key, a missing field, a bad date, the same mutant twice | blocked: the file cannot be read |
+| An entry that no mutant matches any more, or whose mutant is now killed | failed: the entry is stale |
+| An entry that matches two mutants (the same three lines twice) | failed: it must name exactly one |
+
+It is shrink-only both ways: a survivor with no entry fails the changed-line run, and an entry that
+outlived its mutant fails every run that judged its line. `ledgerFile` names another file.
+
+## Request options
+
+| Option | Default | Meaning |
+|---|---|---|
+| `configFile` | `stryker.config.mjs` | The Stryker config in the target package. |
+| `baselineFile` | `mutation-baseline.json` | The baseline in the target package. |
+| `ledgerFile` | `mutation-ledger.json` | The ledger in the target package. |
+| `reportDir` | `.noctcore/mutation` | Where reports must live, repo-relative. |
+| `neverMutate` | none | Repo-relative path prefixes a changed-line run never mutates. |
+| `dropTolerance` | `1` | Points under the baseline that still pass. |
+| `staleMargin` | `2` | Points over the baseline before it is stale. |
+| `acceptHint` | `run an accepted mutation run (accept: true)` | How to record a new baseline, in messages. |
+
+## Risks
+
+- **Stryker peer version skew.** The verdict reads Stryker's JSON report (mutation-testing-report
+  schema 3) and its `Instrumented N source file(s) with M mutant(s)` log line. The peer range is
+  `^10.0.0`; a Stryker major that changes either reads as a failed or blocked run, never a pass, but
+  it will turn the gate red until the package supports it. Keep `@stryker-mutator/core` and its
+  runner plugin on the same version, and move them in their own change.
+- **Changed lines on an enforced path is your choice.** A changed-line run is partial by design: it
+  does not see a mutant spanning untouched lines, a deletion, or a rename with no changed line, and
+  its verdict depends on the base ref and on CI fetching enough history. Whether it blocks a merge,
+  runs as advice, or only runs locally is a decision for your repo; the package gives it its own
+  check id so you can wire it either way. The whole-package ratchet is what sees everything.
+
+## API
+
+The full signatures are in the [API reference](/harness/reference/api/noctcore/harness-mutation/).
