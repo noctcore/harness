@@ -1032,8 +1032,13 @@ describe('reportFileRefusal', () => {
       join(ROOT, '.noctcore', 'mutation'),
       join(ROOT, '.noctcore', 'other.json'),
       join(ROOT, 'package.json'),
+      join(ROOT, '.noctcore', 'mutation-other', 'x.json'),
+      resolve(ROOT, '..', 'elsewhere', '.noctcore', 'mutation', 'x.json'),
+      resolve(ROOT, '.noctcore', 'mutation', '..', 'inventory', 'lib.junit.xml'),
     ]) {
-      assert.equal(reportFileRefusal(ROOT, file)?.status, 'failed', file);
+      const refusal = reportFileRefusal(ROOT, file);
+      assert.equal(refusal?.status, 'failed', file);
+      assert.match(refusal?.reason ?? '', /is not under \.noctcore\/mutation\//u, file);
     }
   });
 
