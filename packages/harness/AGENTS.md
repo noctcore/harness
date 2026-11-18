@@ -100,12 +100,14 @@ port of the in-process Rust runner in `apps/desktop/src-tauri/src/workflow/gaunt
   No network call: the caller does the GitHub lookup and passes the result in. Workflows, job
   names, exempt shas and ledger paths are the consumer's, never literals here.
 - `src/web-budget.ts` + `src/web-budget/`: the `@noctcore/harness/web-budget` subpath. The
-  defensive Vite manifest reader (`manifest.ts`), the build graph (`graph.ts`), shell, route and
-  file budgets (`budgets.ts`), dead dynamic imports (`dead-imports.ts`), the report and freshness
-  check (`report.ts`) and the precompress check (`precompress.ts`). Pure over injected deps;
-  `node.ts` holds the real ones (`node:fs`, `node:zlib`). The budgets file, manifest path and
-  server paths are the consumer's. Nothing here writes or raises a budget: do not add a tolerance,
-  override or update helper. `test-support.ts` is a test-only synthetic app (never bundled).
+  defensive Vite manifest reader and chunk graph (`build-graph.ts`), route baselines
+  (`route-budget.ts`), file budgets and a route's own chunks (`file-budget.ts`), dead dynamic
+  imports (`dead-dynamic-imports.ts`), the nginx model (`nginx-conf.ts`, `served-encoding.ts`, fails
+  closed on anything it cannot read), the brotli copies (`precompress.ts`), source freshness
+  (`freshness.ts`), the build loader (`web-build.ts`) and the script runner (`run-budget.ts`). Pure
+  over injected deps; `node.ts` holds the real ones. Limits, paths and the server configuration are
+  the consumer's. Nothing here writes or raises a limit: do not add a tolerance, override or update
+  helper (headroom only prints).
 - `src/index.ts` — the public type barrel (manifest + result shapes) PLUS the portable lint-meta
   contract (`IMetaRule` / `IMetaCtx` / `IViolation`) + the ratchet helpers a generated rule imports.
 

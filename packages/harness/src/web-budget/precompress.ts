@@ -1,162 +1,186 @@
-import { toPosix } from './manifest.js';
-
 /*
- * A web server set to serve precompressed files (nginx `gzip_static` and
- * `brotli_static`) falls back to the plain file, or compresses on every
- * request, when a `.br` or `.gz` sibling is missing. Nothing breaks visibly,
- * so this checks the build output: every file the server should serve
- * compressed has a non-empty sibling per encoding, no older than the file.
+ * The brotli copies a web server serves. nginx's `brotli_static` sends
+ * `<file>.br` to a client that accepts `br` when that file sits next to the
+ * original, so the server never compresses anything at request time. A build
+ * step runs `precompressDir` over the final build output, and the budgets weigh
+ * the same bytes (`servedSize`), so what a budget weighs is what the server
+ * holds. `checkPrecompressed` is the gate for an output someone else wrote:
+ * every copy present, current and nothing more.
  */
+import { brotliCompressSync, brotliDecompressSync, constants } from 'node:zlib';
 
-export interface IFileStat {
-  readonly size: number;
-  readonly mtimeMs: number;
-}
+import { toPosix } from './build-graph.js';
+import type { IBudgetReport } from './report.js';
 
-export interface IPrecompressDeps {
-  /** Every file under `dir`, relative to it with `/` separators, or null when `dir` cannot be read. */
-  readonly listFiles: (dir: string) => readonly string[] | null;
-  /** A file's size and modification time (`dir`-relative path), or null when it does not exist. */
-  readonly stat: (dir: string, file: string) => IFileStat | null;
-}
+/** Brotli's top quality: the work is done once, at build time. */
+export const BROTLI_QUALITY = 11;
+
+/** The suffix of a precompressed copy: what `brotli_static` looks for. */
+export const BROTLI_SUFFIX = '.br';
+
+/**
+ * What gets a `.br` by default, by extension, with the Content-Type a server
+ * typically sends it as. Keep every type in the server's `gzip_types` (or
+ * text/html, which nginx always compresses), so a client with br never gets
+ * less than one with gzip. Fonts and images are already compressed formats.
+ */
+export const PRECOMPRESS_TYPES: Readonly<Record<string, string>> = {
+  atom: 'application/atom+xml',
+  css: 'text/css',
+  html: 'text/html',
+  js: 'application/javascript',
+  json: 'application/json',
+  svg: 'image/svg+xml',
+  txt: 'text/plain',
+  xml: 'text/xml',
+};
+
+/** The default length floor, the same as nginx's default `gzip_min_length`. */
+export const PRECOMPRESS_MIN_LENGTH = 20;
 
 export interface IPrecompressOptions {
-  /** The build output directory the server serves. */
-  readonly dir: string;
-  /** File extensions served compressed. Defaults to `PRECOMPRESS_EXTENSIONS`. */
-  readonly extensions?: readonly string[];
-  /** Files smaller than this are served plain (nginx `gzip_min_length`). Defaults to 1024. */
-  readonly minBytes?: number;
-  /** Sibling suffixes, without the dot. Defaults to `br` and `gz`. */
-  readonly encodings?: readonly string[];
-  /** Built paths (dir-relative) never checked, matched exactly. */
-  readonly exclude?: readonly string[];
+  /** Extensions (no dot, lower case) that get a copy, with their Content-Type. Defaults to `PRECOMPRESS_TYPES`. */
+  readonly types?: Readonly<Record<string, string>>;
+  /** Files shorter than this get no copy. Match the server's `gzip_min_length`. Defaults to 20. */
+  readonly minLength?: number;
+  /**
+   * Paths under the root that never get a copy: a file the server rewrites at
+   * start (a copy would describe a file nobody serves), or one it never serves.
+   */
+  readonly never?: readonly string[];
 }
 
-/** Text-like extensions a server typically serves compressed. */
-export const PRECOMPRESS_EXTENSIONS: readonly string[] = [
-  '.css',
-  '.html',
-  '.js',
-  '.json',
-  '.mjs',
-  '.svg',
-  '.txt',
-  '.wasm',
-  '.webmanifest',
-  '.xml',
-];
-
-/** Files under this many bytes are not checked, unless `minBytes` says otherwise. */
-export const PRECOMPRESS_MIN_BYTES = 1024;
-
-export interface IPrecompressProblem {
-  readonly file: string;
-  readonly encoding: string;
-  readonly kind: 'missing' | 'empty' | 'stale';
-  readonly message: string;
+/** The I/O `precompressDir` and `checkPrecompressed` need, over paths under `dir` with `/` separators. */
+export interface IPrecompressDeps {
+  /** Every file under `dir`, at any depth. */
+  readonly listFiles: (dir: string) => readonly string[];
+  readonly readFile: (dir: string, file: string) => Buffer;
+  readonly writeFile: (dir: string, file: string, body: Buffer) => void;
+  readonly removeFile: (dir: string, file: string) => void;
 }
 
-export interface IPrecompressReport {
-  readonly passed: boolean;
-  /** How many files needed precompressed siblings. */
-  readonly checked: number;
-  readonly problems: readonly IPrecompressProblem[];
-  /** Failures that stopped the check: an unreadable dir, nothing to check, a bad option. */
-  readonly errors: readonly string[];
+export interface IPrecompressRun {
+  /** Files that got a `.br`, as paths under the directory. */
+  readonly written: readonly string[];
+  /** `.br` files that were there before and were removed first. */
+  readonly removed: readonly string[];
 }
 
-/** Check every matching file under `options.dir` for its precompressed siblings. */
-export function checkPrecompressed(
-  options: IPrecompressOptions,
-  deps: IPrecompressDeps,
-): IPrecompressReport {
-  const extensions = (options.extensions ?? PRECOMPRESS_EXTENSIONS).map((ext) =>
-    (ext.startsWith('.') ? ext : `.${ext}`).toLowerCase(),
-  );
-  const encodings = options.encodings ?? ['br', 'gz'];
-  const minBytes = options.minBytes ?? PRECOMPRESS_MIN_BYTES;
-  const fail = (error: string): IPrecompressReport => ({
-    passed: false,
-    checked: 0,
-    problems: [],
-    errors: [error],
+/** The file's extension without the dot, lower case, or '' for none. */
+function extensionOf(file: string): string {
+  return (/\.([^./\\]+)$/u.exec(file)?.[1] ?? '').toLowerCase();
+}
+
+/** `file` as a path under the root with `/` separators, whatever the platform. */
+export function rootRelative(file: string): string {
+  return toPosix(file).replace(/^\.?\//u, '');
+}
+
+/** One body as brotli at BROTLI_QUALITY: the text mode and a size hint, as an encoder is told. */
+export function brotliBytes(body: Buffer): Buffer {
+  return brotliCompressSync(body, {
+    params: {
+      [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY,
+      [constants.BROTLI_PARAM_MODE]: constants.BROTLI_MODE_TEXT,
+      [constants.BROTLI_PARAM_SIZE_HINT]: body.length,
+    },
   });
-  if (!Number.isFinite(minBytes) || minBytes < 0) {
-    return fail(`precompress: minBytes must be zero or more, got ${String(minBytes)}`);
-  }
-  if (encodings.length === 0 || extensions.length === 0) {
-    return fail('precompress: extensions and encodings must each name at least one value');
-  }
-  const listed = deps.listFiles(options.dir);
-  if (listed === null) return fail(`${options.dir} cannot be read: run the build first`);
-  const files = listed.map(toPosix).sort();
-  const exclude = new Set((options.exclude ?? []).map(toPosix));
-  const siblingSuffixes = encodings.map((encoding) => `.${encoding}`);
+}
 
-  const problems: IPrecompressProblem[] = [];
-  let checked = 0;
-  for (const file of files) {
-    if (exclude.has(file)) continue;
-    if (siblingSuffixes.some((suffix) => file.endsWith(suffix))) continue;
-    const lower = file.toLowerCase();
-    if (!extensions.some((ext) => lower.endsWith(ext))) continue;
-    const original = deps.stat(options.dir, file);
-    if (original === null || original.size < minBytes) continue;
-    checked += 1;
-    for (const encoding of encodings) {
-      const sibling = `${file}.${encoding}`;
-      const stat = deps.stat(options.dir, sibling);
-      if (stat === null) {
-        problems.push({
-          file,
-          encoding,
-          kind: 'missing',
-          message: `${sibling} is missing: run the precompress step after the build`,
-        });
-      } else if (stat.size === 0) {
-        problems.push({
-          file,
-          encoding,
-          kind: 'empty',
-          message: `${sibling} is empty: the precompress step failed, run it again`,
-        });
-      } else if (stat.mtimeMs < original.mtimeMs) {
-        problems.push({
-          file,
-          encoding,
-          kind: 'stale',
-          message: `${sibling} is older than ${file}: run the precompress step after the build`,
-        });
-      }
+/**
+ * The `.br` copy of a file of the build, or null when it gets none: a kind of
+ * file that is not in `types`, one of `never`, one under the length floor, or
+ * one brotli cannot make smaller. `file` is the path under the root.
+ */
+export function precompressedBody(
+  file: string,
+  body: Buffer,
+  options: IPrecompressOptions = {},
+): Buffer | null {
+  const relativePath = rootRelative(file);
+  const types = options.types ?? PRECOMPRESS_TYPES;
+  if (!Object.hasOwn(types, extensionOf(relativePath))) return null;
+  if ((options.never ?? []).map(rootRelative).includes(relativePath)) return null;
+  if (body.length < (options.minLength ?? PRECOMPRESS_MIN_LENGTH)) return null;
+  const packed = brotliBytes(body);
+  return packed.length < body.length ? packed : null;
+}
+
+function sortedFiles(deps: IPrecompressDeps, dir: string): string[] {
+  return deps.listFiles(dir).map(rootRelative).sort();
+}
+
+/**
+ * Give every eligible file under `dir` a `.br`. Every `.br` already there is
+ * removed first, so a copy can never outlive or predate the file it stands
+ * for: after this, the copies are exactly the ones this run wrote. A run that
+ * wrote nothing should fail its caller: a build with no compressible file is
+ * not the build it was meant to be.
+ */
+export function precompressDir(
+  dir: string,
+  deps: IPrecompressDeps,
+  options: IPrecompressOptions = {},
+): IPrecompressRun {
+  const removed: string[] = [];
+  for (const file of sortedFiles(deps, dir)) {
+    if (file.endsWith(BROTLI_SUFFIX)) {
+      deps.removeFile(dir, file);
+      removed.push(file);
     }
   }
-  if (checked === 0) {
-    return {
-      passed: false,
-      checked,
-      problems,
-      errors: [
-        `${options.dir} holds no file to check (extensions ${extensions.join(' ')}, at least ${minBytes} bytes): is it the build output?`,
-      ],
-    };
+  const written: string[] = [];
+  for (const file of sortedFiles(deps, dir)) {
+    const packed = precompressedBody(file, deps.readFile(dir, file), options);
+    if (packed === null) continue;
+    deps.writeFile(dir, `${file}${BROTLI_SUFFIX}`, packed);
+    written.push(file);
   }
-  return { passed: problems.length === 0, checked, problems, errors: [] };
+  return { written, removed };
 }
 
-/** Console lines for a report: each failure, then a summary. */
-export function formatPrecompressReport(
-  report: IPrecompressReport,
-  label = 'precompress',
-): string[] {
-  const lines = [
-    ...report.errors.map((error) => `✗ ${error}`),
-    ...report.problems.map((problem) => `✗ ${problem.message}`),
-  ];
-  lines.push(
-    report.passed
-      ? `${label}: passed (${report.checked} files, every sibling present)`
-      : `${label}: failed (${report.errors.length + report.problems.length} problems over ${report.checked} files)`,
-  );
-  return lines;
+function decodes(copy: Buffer, body: Buffer): boolean {
+  try {
+    return brotliDecompressSync(copy).equals(body);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check the copies under `dir` without writing anything: every eligible file
+ * has a `.br` that decodes to it, and no `.br` stands for a file that is gone
+ * or gets no copy. A directory with no eligible file is a problem too: a check
+ * that checked nothing is not a pass.
+ */
+export function checkPrecompressed(
+  dir: string,
+  deps: Pick<IPrecompressDeps, 'listFiles' | 'readFile'>,
+  options: IPrecompressOptions = {},
+): IBudgetReport {
+  const files = deps.listFiles(dir).map(rootRelative).sort();
+  const present = new Set(files);
+  const problems: string[] = [];
+  const expected = new Set<string>();
+  for (const file of files) {
+    if (file.endsWith(BROTLI_SUFFIX)) continue;
+    const body = deps.readFile(dir, file);
+    if (precompressedBody(file, body, options) === null) continue;
+    const copy = `${file}${BROTLI_SUFFIX}`;
+    expected.add(copy);
+    if (!present.has(copy)) {
+      problems.push(`${copy} is missing: run the precompress step after the build`);
+    } else if (!decodes(deps.readFile(dir, copy), body)) {
+      problems.push(`${copy} does not decode to ${file}: run the precompress step after the build`);
+    }
+  }
+  for (const file of files) {
+    if (file.endsWith(BROTLI_SUFFIX) && !expected.has(file)) {
+      problems.push(
+        `${file} stands for a file that is gone or gets no copy: run the precompress step, which removes it`,
+      );
+    }
+  }
+  if (expected.size === 0) problems.push(`nothing under ${dir} gets a precompressed copy`);
+  return { lines: [`${expected.size} files with a precompressed copy`], problems };
 }

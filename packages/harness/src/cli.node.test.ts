@@ -345,23 +345,24 @@ process.stdout.write(ci.affectedEnvLines(decision).join(' '));`;
 describe('the web-budget subpath runs under plain node', () => {
   // A repo budget script imports the subpath by file URL, the way an installed
   // `@noctcore/harness/web-budget` resolves, and checks a synthetic build.
-  test('imports, weighs a manifest from injected sizes, and fails an over-budget route', () => {
+  test('imports, reads a manifest, weighs a route as nginx serves it, and fails it over its baseline', () => {
     const url = pathToFileURL(WEB_BUDGET).href;
     const script = `import * as wb from ${JSON.stringify(url)};
-const manifest = wb.parseViteManifest({
-  'index.html': { file: 'main.js', isEntry: true, dynamicImports: ['src/a.ts'] },
-  'src/a.ts': { file: 'a.js', isDynamicEntry: true },
+const graph = wb.parseManifest(JSON.stringify({
+  'index.html': { file: 'assets/main.js', isEntry: true, dynamicImports: ['src/a.ts'] },
+  'src/a.ts': { file: 'assets/a.js' },
+}));
+const encoding = wb.parseServedEncoding('server { gzip off; }');
+const sizeOf = (file) => wb.servedSize(encoding, file, Buffer.alloc(file === 'assets/a.js' ? 1500 : 1000)).bytes;
+const report = wb.checkRoutes(graph, sizeOf, {
+  baselines: [{ route: '/a', sources: ['src/a.ts'], coldKb: 2, beyondKb: 1 }],
 });
-const sizes = { 'main.js': 100, 'a.js': 50 };
-const result = wb.checkWebBudget({
-  manifest,
-  sizeOf: (file) => sizes[file] ?? null,
-  budgets: { shell: 200, routes: { 'src/a.ts': { cold: 40 } } },
-});
-process.stdout.write(result.passed + ' ' + result.violations.map((v) => v.kind + ':' + v.overBy).join(','));`;
+process.stdout.write(report.problems.map((p) => p.split(':').slice(0, 2).join(':')).join('|'));`;
     const res = spawnSync('node', ['--input-type=module', '-e', script], { encoding: 'utf8' });
     expect(res.stderr).toBe('');
-    expect(res.stdout).toBe('false route-cold:10');
+    expect(res.stdout).toBe(
+      '/a: cold 2.50 kB is 0.50 kB over its 2 kB baseline|/a: beyond the shell 1.50 kB is 0.50 kB over its 1 kB baseline',
+    );
   });
 });
 

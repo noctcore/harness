@@ -1,90 +1,99 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
-import { brotliCompressSync, constants, gzipSync } from 'node:zlib';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join } from 'node:path';
 
-import type { SizeOf } from './graph.js';
-import type { IManifestReadDeps } from './manifest.js';
-import type { IFileStat, IPrecompressDeps } from './precompress.js';
+import { DEFAULT_SKIPPED_DIRS } from './freshness.js';
+import type { IPrecompressDeps } from './precompress.js';
+import type { IWebBuildDeps } from './web-build.js';
 
 /*
- * The real I/O behind the web budget checks: file reads, sizes measured the
- * way a browser downloads them, and a walk of the build directory. Everything
- * else in the subpath is pure over these.
+ * The real I/O behind the web budget checks: file reads, directory walks and
+ * modification times. Everything else in the subpath is pure over these.
  */
 
-/** How a file's weight is measured: as stored, or compressed at the highest level. */
-export type SizeMeasure = 'raw' | 'gzip' | 'brotli';
-
-function errorCode(error: unknown): unknown {
-  return (error as { code?: unknown }).code;
+/** Read a text file, or null when it does not exist (a budgets file, a configuration). */
+export function nodeReadText(path: string): string | null {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch (error) {
+    if ((error as { code?: unknown }).code === 'ENOENT') return null;
+    throw error;
+  }
 }
 
-/** Manifest read deps: null for a missing file; any other read error throws and becomes a problem. */
-export const nodeManifestDeps: IManifestReadDeps = {
-  readText: (path) => {
+/**
+ * The newest modification time of a file under a directory, skipping
+ * `skipped` directory names at any depth; null when the directory does not
+ * exist. A file that vanishes mid-walk cannot make a build stale.
+ */
+export function nodeNewestMtime(
+  skipped: readonly string[] = DEFAULT_SKIPPED_DIRS,
+): (dir: string) => number | null {
+  const skip = new Set(skipped);
+  const walk = (dir: string): number => {
+    let newest = 0;
+    let entries;
     try {
-      return readFileSync(path, 'utf8');
-    } catch (error) {
-      if (errorCode(error) === 'ENOENT') return null;
-      throw error;
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return newest;
     }
-  },
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (!skip.has(entry.name)) newest = Math.max(newest, walk(join(dir, entry.name)));
+      } else if (entry.isFile()) {
+        try {
+          newest = Math.max(newest, statSync(join(dir, entry.name)).mtimeMs);
+        } catch {
+          // Gone between the listing and the stat.
+        }
+      }
+    }
+    return newest;
+  };
+  return (dir) => (existsSync(dir) ? walk(dir) : null);
+}
+
+/** `loadWebBuild` deps over the real file system. */
+export const nodeWebBuildDeps: IWebBuildDeps = {
+  exists: (path) => existsSync(path),
+  readText: (path) => readFileSync(path, 'utf8'),
+  readFile: (path) => readFileSync(path),
+  listDir: (path) => readdirSync(path),
+  mtimeMs: (path) => statSync(path).mtimeMs,
+  newestMtime: nodeNewestMtime(),
 };
 
-/** Read a text file, or null when it does not exist (a committed report, say). */
-export function nodeReadText(path: string): string | null {
-  return nodeManifestDeps.readText(path);
-}
-
-/** Measure files under `dir` (`/`-separated relative paths) as `measure` bytes. Defaults to gzip. */
-export function nodeSizeOf(dir: string, measure: SizeMeasure = 'gzip'): SizeOf {
-  return (file) => {
-    let body: Buffer;
-    try {
-      body = readFileSync(join(dir, ...file.split('/')));
-    } catch {
-      return null;
-    }
-    if (measure === 'raw') return body.length;
-    if (measure === 'brotli') {
-      return brotliCompressSync(body, {
-        params: {
-          [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY,
-          [constants.BROTLI_PARAM_SIZE_HINT]: body.length,
-        },
-      }).length;
-    }
-    return gzipSync(body, { level: 9 }).length;
-  };
-}
-
-function walk(root: string, rel: string, out: string[]): void {
+function filesUnder(root: string, rel: string, out: string[]): void {
   for (const entry of readdirSync(join(root, ...rel.split('/').filter(Boolean)), {
     withFileTypes: true,
   })) {
     const path = rel === '' ? entry.name : `${rel}/${entry.name}`;
-    if (entry.isDirectory()) walk(root, path, out);
+    if (entry.isDirectory()) filesUnder(root, path, out);
     else if (entry.isFile()) out.push(path);
   }
 }
 
-/** Precompress deps over the real file system. Symlinks are not followed. */
+const under = (dir: string, file: string): string => join(dir, ...file.split('/'));
+
+/** `precompressDir` and `checkPrecompressed` deps over the real file system. Symlinks are not followed. */
 export const nodePrecompressDeps: IPrecompressDeps = {
   listFiles: (dir) => {
     const out: string[] = [];
-    try {
-      walk(dir, '', out);
-    } catch {
-      return null;
-    }
+    filesUnder(dir, '', out);
     return out;
   },
-  stat: (dir, file): IFileStat | null => {
-    try {
-      const stat = statSync(join(dir, ...file.split('/')));
-      return stat.isFile() ? { size: stat.size, mtimeMs: stat.mtimeMs } : null;
-    } catch {
-      return null;
-    }
+  readFile: (dir, file) => readFileSync(under(dir, file)),
+  writeFile: (dir, file, body) => {
+    mkdirSync(dirname(under(dir, file)), { recursive: true });
+    writeFileSync(under(dir, file), body);
   },
+  removeFile: (dir, file) => rmSync(under(dir, file)),
 };

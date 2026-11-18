@@ -166,37 +166,44 @@ scheduled workflow that your repo wires catches it.
 
 ## Web bundle budgets (`@noctcore/harness/web-budget`)
 
-Hold a Vite build to the budgets your repo commits. The manifest is read defensively (a wrong
-type, a missing `file` or an empty manifest fails the check), each route is weighed cold and beyond
-the shell, and every failure says what to do next.
+Hold a Vite build to the limits your repo commits, weighing every file the way your nginx
+configuration serves it. A build that is missing, stale or mixed with another is refused before any
+number is printed, and every failure says what to do next.
 
 ```ts
 import { readFileSync } from 'node:fs';
 
-import { checkWebBudget, formatWebBudgetSummary, nodeManifestDeps, nodeSizeOf, readViteManifest } from '@noctcore/harness/web-budget';
+import { checkRoutes, loadWebBuild, nodeWebBuildDeps, parseServedEncoding, runBudget } from '@noctcore/harness/web-budget';
 
-const result = checkWebBudget({
-  manifest: readViteManifest('dist/.vite/manifest.json', nodeManifestDeps),
-  sizeOf: nodeSizeOf('dist', 'gzip'),
-  budgets: JSON.parse(readFileSync('budgets.json', 'utf8')),
-});
-console.log(formatWebBudgetSummary(result).join('\n'));
-process.exit(result.passed ? 0 : 1);
+const encoding = parseServedEncoding(readFileSync('nginx.conf', 'utf8'));
+process.exit(
+  runBudget(
+    'routes',
+    { out: console.log, err: console.error },
+    () => loadWebBuild({ distDir: 'dist', sourceRoots: ['src'], weigh: { encoding } }, nodeWebBuildDeps),
+    (build) =>
+      checkRoutes(build.graph, build.sizeOf, {
+        baselines: [{ route: '/', sources: ['src/routes/index.tsx'], coldKb: 150, beyondKb: 10 }],
+      }),
+  ),
+);
 ```
 
 | Export | What it does |
 |---|---|
-| `parseViteManifest(raw)`, `parseViteManifestText(text)`, `readViteManifest(path, deps)` | Read the Vite manifest, type-checking every field it uses and ignoring unknown ones; any problem fails the check. |
-| `buildGraph(manifest, sizeOf, options)`, `staticClosure(chunks, start)` | Static closures, the shell (every `isEntry` chunk, or `shellEntries`), and each route's cold and beyond-shell weight, each file counted once. |
-| `parseWebBudgets(raw)`, `checkBudgets(graph, budgets)`, `matchesPattern(pattern, path)` | Shell, route (`cold`, `beyondShell`) and per-file budgets; an over-budget weight, a stale route or pattern, and an invalid budget all fail. |
-| `findDeadImports(graph, { allow })` | Dynamic imports whose target is already loaded (statically or by the shell) or missing; each allowed one needs a written reason. |
-| `checkWebBudget(input)`, `formatWebBudgetReport(result)`, `formatWebBudgetSummary(result)`, `reportIsFresh(committed, rendered)` | Everything in one call, a deterministic Markdown report to commit, and the freshness check (CRLF equals LF). |
-| `checkPrecompressed(options, deps)`, `formatPrecompressReport(report)` | Every file the server serves compressed (by extension, at least `minBytes`) has a non-empty, fresh sibling per encoding (`br`, `gz`). |
-| `nodeManifestDeps`, `nodeReadText(path)`, `nodeSizeOf(dir, measure)`, `nodePrecompressDeps` | The real I/O; sizes are raw, gzip (default) or brotli bytes. |
+| `parseManifest(json, label)`, `staticClosure`, `entryFiles`, `chunksOfSource`, `loadRoots` | Read the Vite manifest defensively into a graph of script chunks (a missing reference, a wrong type, a path outside the build or no script chunk throws) and walk it. |
+| `loadWebBuild(options, deps)`, `buildProblems`, `documentScripts`, `newerSourceRoots`, `measuredSize` | Load one build: refuse no build, no manifest, a build older than `sourceRoots`, or a directory two builds wrote into; weigh files as served, or raw, gzip or brotli. |
+| `checkRoutes(graph, sizeOf, budget, headroom)`, `unbuilt` | Each route's cold weight (shell plus route) and weight beyond its shell against its baselines; named shells via `shells`. |
+| `parseFileBudgets(json)`, `checkFileBudgets(...)`, `matchFiles`, `ownChunks` | `{ name, path or route, limit: "<n> kB" }` budgets over file patterns or a route's own chunks; a pattern or route that names nothing fails. |
+| `checkDynamicImports(graph, options)`, `findDeadDynamicImports`, `describeDeadImport`, `countDynamicImports` | `import()` calls whose target is already loaded (`same-chunk`, `static`, `entry`, `loaded-with`); a build with none fails unless `requireDynamicImports: false`. |
+| `parseServedEncoding(conf, options)`, `servedSize`, `servedVary`, `servedCompressible`, `servedMimeType`, `describeEncoding`, `nginxStatements` | The nginx gzip and `brotli_static` model; fails closed on a directive, include or `types` block it has no model for. |
+| `precompressDir(dir, deps, options)`, `checkPrecompressed`, `precompressedBody`, `brotliBytes` | Write the `.br` copies (old ones removed first) and check them: missing, not decoding to the file, or standing for no file. |
+| `runBudget(name, io, load, check)`, `headroomFromArgv(argv)`, `asKb` | Run a budget script with prefixed output and exit code 0 or 1; `--headroom` only prints limits. |
+| `nodeWebBuildDeps`, `nodePrecompressDeps`, `nodeNewestMtime`, `nodeReadText` | The real I/O. |
 
-The budgets file, the manifest path and the web server paths stay in your repo. Raising a budget
-needs a written reason in a reviewed change: the module never writes the budgets file and has no
-tolerance or override, so there is no way to raise a budget silently.
+The limits, the build and manifest paths, and the nginx configuration stay in your repo. Raising a
+baseline or a limit needs a written reason in a reviewed change: the module never writes a limit and
+has no tolerance or override, so there is no way to raise a budget silently.
 
 ## Rule catalog (`catalog`)
 
