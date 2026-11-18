@@ -34,12 +34,16 @@ export interface IPinnedTool {
 /** A pinned tool that a check runs natively, or through the image of the tool that needs it. */
 export type IToolPin = IPinnedTool;
 
-/** A pinned linter: native at the pinned version, else its image by digest. */
-export interface ILinterPin extends IPinnedTool {
+/** A pinned tool with an image to fall back to: native at the pinned version, else the image by digest. */
+export interface IImagePin extends IPinnedTool {
   /** The image, pinned by index digest. */
   readonly image: string;
   /** Set when the image is published for this platform only (Rosetta or QEMU elsewhere). */
   readonly platform?: string;
+}
+
+/** A pinned linter: native at the pinned version, else its image by digest. */
+export interface ILinterPin extends IImagePin {
   /** Native tools that must also be on PATH at their pinned version. */
   readonly needs: readonly IToolPin[];
 }
@@ -128,3 +132,70 @@ export const WORKFLOW_LINTER_TOOLS: readonly IToolPin[] = [ZIZMOR, ACTIONLINT, S
  */
 export const GITLEAKS_IMAGE =
   'ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f';
+
+/**
+ * hadolint: the Dockerfile linter. It links ShellCheck in as a library, so no
+ * native shellcheck is needed on either route. The linux release assets are
+ * the binaries themselves, so neither has a `member`.
+ */
+export const HADOLINT: IImagePin = {
+  name: 'hadolint',
+  version: '2.15.1',
+  versionArgs: ['--version'],
+  image:
+    'ghcr.io/hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d',
+  linux: {
+    x64: {
+      path: 'hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-x86_64',
+      sha256: 'c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507',
+    },
+    arm64: {
+      path: 'hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-arm64',
+      sha256: 'f6198ef8090f404dbb771abfee086eb8c48ac177f30da7fd3510aca35b344b5d',
+    },
+  },
+};
+
+/**
+ * squawk: the Postgres migration linter. The image is published for
+ * linux/amd64 only. The linux release assets are the binaries themselves.
+ */
+export const SQUAWK: IImagePin = {
+  name: 'squawk',
+  version: '2.67.0',
+  versionArgs: ['--version'],
+  image:
+    'ghcr.io/sbdchd/squawk:2.67.0@sha256:48cb8552edce6fbe4f3e5826eb92ea3b798bedf79592e1bce5fddc2b7130a082',
+  platform: 'linux/amd64',
+  linux: {
+    x64: {
+      path: 'sbdchd/squawk/releases/download/v2.67.0/squawk-linux-x64',
+      sha256: '03efe0e666b63bf33e2493693ee0aa9dbed07cbdcd20f7a8292245c1da9d790a',
+    },
+    arm64: {
+      path: 'sbdchd/squawk/releases/download/v2.67.0/squawk-linux-arm64',
+      sha256: '25c4f95f81bcdbb0a0dc909820c22eb657a12381558b7275bd69f98f253b9b64',
+    },
+  },
+};
+
+/** trivy: the image scanner (vulnerabilities and secrets). */
+export const TRIVY: IImagePin = {
+  name: 'trivy',
+  version: '0.75.0',
+  versionArgs: ['--version'],
+  image:
+    'ghcr.io/aquasecurity/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa',
+  linux: {
+    x64: {
+      path: 'aquasecurity/trivy/releases/download/v0.75.0/trivy_0.75.0_Linux-64bit.tar.gz',
+      sha256: 'c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f',
+      member: 'trivy',
+    },
+    arm64: {
+      path: 'aquasecurity/trivy/releases/download/v0.75.0/trivy_0.75.0_Linux-ARM64.tar.gz',
+      sha256: 'a1ee9f6ffb7d112b64ff726a2a0717c21175c1114361391f4a132956751a13b3',
+      member: 'trivy',
+    },
+  },
+};

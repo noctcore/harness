@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -7,9 +15,17 @@ import { afterAll, describe, expect, test } from 'bun:test';
 
 import {
   dockerAvailable,
+  gitTrackedFiles,
+  migrationDirsUnder,
+  nodeCapturedDeps,
   nodeFetchDeps,
   nodeGitleaksDeps,
+  nodeHadolintDeps,
   nodeRunDeps,
+  nodeSquawkDeps,
+  nodeTrivyScanDeps,
+  readRepoFile,
+  spawnCaptured,
   workflowFilesUnder,
 } from './node.js';
 
@@ -112,6 +128,18 @@ describe('the Docker probes, through a CLI that does not exist', () => {
     expect(deps.pull('example.invalid/tool:1.0.0')).toBe(false);
   });
 
+  test('report the same through the captured deps, a platform pull included', () => {
+    const deps = nodeCapturedDeps({ docker: MISSING });
+    expect(deps.dockerCommand).toBe(MISSING);
+    expect(deps.dockerAvailable()).toBe(false);
+    expect(deps.imagePresent('example.invalid/tool:1.0.0')).toBe(false);
+    expect(deps.pull('example.invalid/tool:1.0.0', 'linux/amd64')).toBe(false);
+    expect(nodeHadolintDeps({ docker: MISSING }).dockerCommand).toBe(MISSING);
+    expect(nodeSquawkDeps({ docker: MISSING }).dockerCommand).toBe(MISSING);
+    expect(nodeTrivyScanDeps({ docker: MISSING }).dockerAvailable()).toBe(false);
+    expect(nodeCapturedDeps().dockerCommand).toBe('docker');
+  });
+
   test('thread the one command into both the run deps and the gitleaks deps', () => {
     expect(nodeRunDeps({ docker: MISSING }).dockerCommand).toBe(MISSING);
     expect(nodeRunDeps().dockerCommand).toBe('docker');
@@ -141,5 +169,105 @@ describe('nodeFetchDeps on a real archive', () => {
     expect(deps.versionOf(process.execPath, { ...runtime, linux: {} as never })).toMatch(
       /^\d+\.\d+\.\d+$/u,
     );
+  });
+});
+
+describe('the captured run deps', () => {
+  test('capture what a command prints, and report one that could not start as null', () => {
+    const ran = spawnCaptured(
+      process.execPath,
+      ['-e', 'console.log("out"); console.error("err")'],
+      tempDir(),
+    );
+    expect(ran).toEqual({ code: 0, stdout: 'out\n', stderr: 'err\n' });
+    expect(spawnCaptured('no-such-pinned-tool-x', [], tempDir()).code).toBeNull();
+    const missing = { name: 'no-such-pinned-tool-x', version: '1.0.0', versionArgs: ['--version'] };
+    expect(nodeCapturedDeps().nativeVersion({ ...missing, linux: {} as never })).toBeNull();
+  });
+
+  test('read a repo-relative file, and nothing for a directory or a missing file', () => {
+    const root = tempDir();
+    mkdirSync(join(root, 'a', 'b'), { recursive: true });
+    writeFileSync(join(root, 'a', 'b', 'c.txt'), 'text');
+    expect(readRepoFile(root, 'a/b/c.txt')).toBe('text');
+    expect(readRepoFile(root, 'a/b')).toBeNull();
+    expect(readRepoFile(root, 'a/missing.txt')).toBeNull();
+    const deps = nodeHadolintDeps();
+    expect(deps.read(root, 'a/b/c.txt')).toBe('text');
+  });
+
+  test("list git's tracked files with / separators, and nothing outside a repository", () => {
+    const root = tempDir();
+    const git = (...args: string[]) => spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+    expect(git('init', '-q').status).toBe(0);
+    mkdirSync(join(root, 'svc'));
+    writeFileSync(join(root, 'svc', 'Dockerfile'), 'FROM scratch\n');
+    writeFileSync(join(root, 'untracked.txt'), '');
+    expect(git('add', 'svc/Dockerfile').status).toBe(0);
+    expect(gitTrackedFiles(root)).toEqual(['svc/Dockerfile']);
+    expect(nodeHadolintDeps().tracked(root)).toEqual(['svc/Dockerfile']);
+    expect(gitTrackedFiles(join(root, 'missing'))).toBeNull();
+  });
+});
+
+describe('migrationDirsUnder', () => {
+  test('lists every folder, whether it holds the migration file, and a link as a link', () => {
+    const root = tempDir();
+    const dir = join(root, 'db', 'migrations');
+    mkdirSync(join(dir, '1_a'), { recursive: true });
+    mkdirSync(join(dir, '2_b'));
+    writeFileSync(join(dir, '1_a', 'migration.sql'), 'SELECT 1;\n');
+    writeFileSync(join(dir, 'README.md'), '');
+    const linked = process.platform !== 'win32';
+    if (linked) symlinkSync(join(dir, '1_a'), join(dir, '3_link'));
+    const found = [...(migrationDirsUnder(root, 'db/migrations', 'migration.sql') ?? [])].sort(
+      (x, y) => x.name.localeCompare(y.name),
+    );
+    expect(found).toEqual([
+      { name: '1_a', hasSql: true, symlink: false },
+      { name: '2_b', hasSql: false, symlink: false },
+      ...(linked ? [{ name: '3_link', hasSql: true, symlink: true }] : []),
+    ]);
+    expect(
+      nodeSquawkDeps()
+        .migrations(root, 'db/migrations', 'up.sql')
+        ?.every((d) => !d.hasSql),
+    ).toBe(true);
+  });
+
+  test('is null when the directory is missing', () => {
+    expect(migrationDirsUnder(tempDir(), 'db/migrations', 'migration.sql')).toBeNull();
+  });
+});
+
+describe('nodeTrivyScanDeps', () => {
+  test('runs a command without blocking, capturing its output, with the environment it is given', async () => {
+    const deps = nodeTrivyScanDeps();
+    const ran = await deps.run(
+      process.execPath,
+      ['-e', 'console.log(process.env.ONLY_THIS ?? "none"); console.error("e"); process.exit(3)'],
+      { cwd: tempDir(), env: { ...process.env, ONLY_THIS: 'yes' } as Record<string, string> },
+    );
+    expect(ran).toEqual({ code: 3, stdout: 'yes\n', stderr: 'e\n' });
+    const inherited = await deps.run(process.execPath, ['-e', 'console.log("ok")'], {
+      cwd: tempDir(),
+    });
+    expect(inherited.stdout).toBe('ok\n');
+    const missing = await deps.run('no-such-pinned-tool-x', [], { cwd: tempDir() });
+    expect(missing.code).toBeNull();
+  });
+
+  test('writes, makes and removes in the work directory, and hands out random bytes', () => {
+    const deps = nodeTrivyScanDeps();
+    const work = tempDir();
+    deps.mkdir(deps.join(work, 'cache', 'deep'));
+    deps.writeFile(deps.join(work, 'cache', 'deep', 'f'), 'x');
+    expect(readFileSync(join(work, 'cache', 'deep', 'f'), 'utf8')).toBe('x');
+    deps.remove(deps.join(work, 'cache'));
+    expect(existsSync(join(work, 'cache'))).toBe(false);
+    expect(deps.randomBytes(27)).toHaveLength(27);
+    expect(deps.env).toBe(process.env);
+    if (process.platform === 'win32') expect(deps.dockerUser).toEqual([]);
+    else expect(deps.dockerUser?.[0]).toBe('--user');
   });
 });
