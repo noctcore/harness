@@ -22,6 +22,7 @@
     "format:check": "prettier --check .",
     "check:package": "bun scripts/check-package-shape.ts",
     "check:workflows": "bun scripts/check-workflows.ts",
+    "audit": "bun scripts/audit.ts",
     "changeset": "changeset",
     "version-packages": "changeset version && bun install --lockfile-only",
     "release": "bun run build && changeset publish",
@@ -43,5 +44,8 @@
     "publint": "0.3.25",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.1"
+  },
+  "overrides": {
+    "minimatch": "^11.0.9"
   }
 }
