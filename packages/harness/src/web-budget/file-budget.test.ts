@@ -86,18 +86,18 @@ describe('parseFileBudgets', () => {
       parseFileBudgets(
         JSON.stringify([
           { name: 'scripts', path: 'assets\\*.js', limit: '700 kB' },
-          { name: 'sign-in', route: ['src\\routes\\sign-in.tsx'], limit: '4 kB' },
+          { name: 'sign-in', route: ['src\\routes\\sign-in.tsx'], limit: '6 kB' },
         ]),
       ),
     ).toEqual([
       { name: 'scripts', path: 'assets/*.js', limitBytes: 700_000 },
-      { name: 'sign-in', route: ['src/routes/sign-in.tsx'], limitBytes: 4_000 },
+      { name: 'sign-in', route: ['src/routes/sign-in.tsx'], limitBytes: 6_000 },
     ]);
   });
 
   test('reads a limit in kB of 1000 bytes', () => {
-    expect(parseFileBudgets(entry('a', '714.9 kB'))[0]?.limitBytes).toBe(714_900);
-    expect(parseFileBudgets(entry('a', '4 kB'))[0]?.limitBytes).toBe(4_000);
+    expect(parseFileBudgets(entry('a', '512.3 kB'))[0]?.limitBytes).toBe(512_300);
+    expect(parseFileBudgets(entry('a', '6 kB'))[0]?.limitBytes).toBe(6_000);
   });
 
   test('refuses an entry it cannot hold a build to', () => {
@@ -111,20 +111,20 @@ describe('parseFileBudgets', () => {
     expect(() => parseFileBudgets(JSON.stringify([{ name: 'n', path: 'a', limit: 4 }]))).toThrow(
       'expected "<number> kB"',
     );
-    expect(() => parseFileBudgets(entry('', '4 kB'))).toThrow(
+    expect(() => parseFileBudgets(entry('', '6 kB'))).toThrow(
       'needs a path (a file pattern) or a route',
     );
-    expect(() => parseFileBudgets(routeEntry([], '4 kB'))).toThrow('needs a path');
-    expect(() => parseFileBudgets(routeEntry([''], '4 kB'))).toThrow('needs a path');
+    expect(() => parseFileBudgets(routeEntry([], '6 kB'))).toThrow('needs a path');
+    expect(() => parseFileBudgets(routeEntry([''], '6 kB'))).toThrow('needs a path');
     expect(() =>
-      parseFileBudgets(JSON.stringify([{ name: 'n', path: 'a', route: ['b'], limit: '4 kB' }])),
+      parseFileBudgets(JSON.stringify([{ name: 'n', path: 'a', route: ['b'], limit: '6 kB' }])),
     ).toThrow('and only one');
-    expect(() => parseFileBudgets(JSON.stringify([{ path: 'a', limit: '4 kB' }]))).toThrow(
+    expect(() => parseFileBudgets(JSON.stringify([{ path: 'a', limit: '6 kB' }]))).toThrow(
       'has no name',
     );
     expect(() =>
       parseFileBudgets(
-        JSON.stringify([{ name: 'n', path: 'a', limit: '4 kB', tolerance: '1 kB' }]),
+        JSON.stringify([{ name: 'n', path: 'a', limit: '6 kB', tolerance: '1 kB' }]),
       ),
     ).toThrow('options this check does not read: tolerance');
   });
@@ -188,9 +188,9 @@ describe('checkFileBudgets', () => {
 
   test('prints the limit a headroom over today gives, rounded down', () => {
     const budgets = parseFileBudgets(entry('assets/*.css', '30 kB'));
-    expect(checkFileBudgets(budgets, FILES, NO_GRAPH, sizeOf, 3.7).lines).toEqual([
+    expect(checkFileBudgets(budgets, FILES, NO_GRAPH, sizeOf, 4.5).lines).toEqual([
       'assets/*.css: 20.00 kB across 1 files (limit 30.00 kB)',
-      'assets/*.css: at 3.7% headroom, 20.74 kB',
+      'assets/*.css: at 4.5% headroom, 20.90 kB',
     ]);
     expect(() => checkFileBudgets(budgets, FILES, NO_GRAPH, sizeOf, Number.NaN)).toThrow(
       'is not a percentage',
