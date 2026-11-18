@@ -17,6 +17,7 @@ const DIST = path.join(PKG_ROOT, 'dist');
 const CLI = path.join(DIST, 'cli.js');
 const RULES = path.join(DIST, 'rules.js');
 const PINNED_TOOLS = path.join(DIST, 'pinned-tools.js');
+const CI = path.join(DIST, 'ci.js');
 
 const fixtures: string[] = [];
 
@@ -279,6 +280,8 @@ describe('the built dist has no network or Bun imports (supply-chain posture)', 
       'rules.cjs',
       'pinned-tools.js',
       'pinned-tools.cjs',
+      'ci.js',
+      'ci.cjs',
     ]
       .map((f) => path.join(DIST, f))
       .filter((p) => existsSync(p));
@@ -309,6 +312,24 @@ process.stdout.write(route.kind + ' ' + verdict.status + ' ' + t.exitCodeFor(ver
     const res = spawnSync('node', ['--input-type=module', '-e', script], { encoding: 'utf8' });
     expect(res.stderr).toBe('');
     expect(res.stdout).toBe('blocked blocked 2');
+  });
+});
+
+describe('the ci subpath runs under plain node', () => {
+  // A repo CI script imports the subpath by file URL, the way an installed
+  // `@noctcore/harness/ci` resolves, and decides a base with no I/O.
+  test('imports, decides a base from injected deps, and writes the env lines', () => {
+    const url = pathToFileURL(CI).href;
+    const script = `import * as ci from ${JSON.stringify(url)};
+const decision = await ci.decideAffectedBase(
+  { event: 'pull_request', prBaseSha: 'a'.repeat(40), before: '' },
+  { lastGreenPushSha: async () => null, isAncestor: () => true,
+    changedFiles: () => ['packages/ui/a.ts'], isWorkspace: () => true },
+);
+process.stdout.write(ci.affectedEnvLines(decision).join(' '));`;
+    const res = spawnSync('node', ['--input-type=module', '-e', script], { encoding: 'utf8' });
+    expect(res.stderr).toBe('');
+    expect(res.stdout).toBe(`TURBO_SCM_BASE=${'a'.repeat(40)} TURBO_AFFECTED=--affected`);
   });
 });
 

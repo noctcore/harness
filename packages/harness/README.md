@@ -132,6 +132,38 @@ repo that needs another version passes its own pin; moving a default pin is a mi
 the rest of the package this subpath makes no network call: `nodeFetchDeps` takes the `download`
 function from the caller, so the one fetch lives in the consuming repo.
 
+## CI helpers (`@noctcore/harness/ci`)
+
+Three decisions a CI pipeline makes around its checks, as pure functions over injected git and
+GitHub lookups. The package makes no network call: your repo asks the GitHub API for the last
+successful push run and hands the answer in.
+
+```ts
+import { affectedEnvLines, decideAffectedBase, nodeCiGitDeps, nodeIsWorkspace } from '@noctcore/harness/ci';
+
+const git = nodeCiGitDeps(process.cwd());
+const decision = await decideAffectedBase(
+  { event: process.env.GITHUB_EVENT_NAME ?? '', prBaseSha: process.env.PR_BASE_SHA ?? '', before: '' },
+  { ...git, lastGreenPushSha, isWorkspace: nodeIsWorkspace(process.cwd()) },
+);
+console.log(decision.reason);
+console.log(affectedEnvLines(decision).join('\n')); // TURBO_SCM_BASE=..., TURBO_AFFECTED=--affected
+```
+
+| Export | What it does |
+|---|---|
+| `chooseBase(input, deps)`, `affectedBaseFrom(chosen, deps, options)`, `decideAffectedBase(input, deps, options)` | The base a filtered run diffs against: a pull request's base, or on push the head of the last successful push run when it is an ancestor of HEAD. Every doubt (no green run, a throwing lookup, an unreadable diff, a change outside a workspace under `workspaceRoots`) is a full run. |
+| `outsideWorkspaces(paths, isWorkspace, options)`, `headShaOfLatestRun(body)`, `affectedEnvLines(decision, options)` | The changed paths a workspace filter cannot see, the head sha in a GitHub list-workflow-runs response, and the `GITHUB_ENV` lines (variable names are options). |
+| `commitRange(input, chosen, isAncestor)` | The commits a run lints: base to head on a pull request, the green base (else the pushed range) to HEAD on push, HEAD alone otherwise. |
+| `lintPlan(range, inRange, messageOf, exempt)`, `exemptionsFor(event, exempt)`, `exemptionProblems(exempt)` | Skip a listed exempt commit (full sha, reason and recorded message) and lint the rest one by one; a pull request uses no exemption, and a malformed list or a changed message refuses the run. |
+| `runCommitlint(options, deps)` | Run the commitlint command you pass over the plan, printing each command first; exit 0 or 1. |
+| `collectDueEntries(sources, options)`, `dueReport(collection, today, options)`, `formatDueReport(report, total, options)`, `daysLeft(today, due)` | Dated ledger entries (`reviewBy` by default) and trivy `expired_at` dates: list those due within `listDays` (14), fail those within `failDays` (7, or `-1` for lapsed only), and fail any undated entry. |
+| `nodeCiGitDeps(cwd)`, `nodeIsWorkspace(cwd)`, `nodeSpawnInherit(cwd)`, `readDueSources(cwd, ledgers, trivyIgnore)` | The real I/O for the functions above. |
+
+The workflow files, job names, the GitHub lookup, the exempt commit list, the ledger files and the
+scheduled due-date job stay in your repo: a due date turns red on a calendar day, so only a
+scheduled workflow that your repo wires catches it.
+
 ## Rule catalog (`catalog`)
 
 `harness catalog` renders a Markdown table of every rule in the registry: id, category, whether it
