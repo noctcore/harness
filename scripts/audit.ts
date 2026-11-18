@@ -9,8 +9,8 @@
  *
  * Fixed advisories stay fixed in package.json instead: `overrides.minimatch`
  * moves typedoc (which still asks for minimatch ^10.2.5) onto minimatch 11,
- * clearing GHSA-g3hv-75wg-m249 (>=7.0.0 <11.0.1). Drop that override once
- * typedoc depends on minimatch 11 itself.
+ * clearing GHSA-g3hv-75wg-m249 (>=7.0.0 <11.0.1). Review it on 2027-01-18
+ * and drop it once typedoc depends on minimatch 11 itself.
  *
  *   bun run audit
  */
