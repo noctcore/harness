@@ -164,6 +164,40 @@ The workflow files, job names, the GitHub lookup, the exempt commit list, the le
 scheduled due-date job stay in your repo: a due date turns red on a calendar day, so only a
 scheduled workflow that your repo wires catches it.
 
+## Web bundle budgets (`@noctcore/harness/web-budget`)
+
+Hold a Vite build to the budgets your repo commits. The manifest is read defensively (a wrong
+type, a missing `file` or an empty manifest fails the check), each route is weighed cold and beyond
+the shell, and every failure says what to do next.
+
+```ts
+import { readFileSync } from 'node:fs';
+
+import { checkWebBudget, formatWebBudgetSummary, nodeManifestDeps, nodeSizeOf, readViteManifest } from '@noctcore/harness/web-budget';
+
+const result = checkWebBudget({
+  manifest: readViteManifest('dist/.vite/manifest.json', nodeManifestDeps),
+  sizeOf: nodeSizeOf('dist', 'gzip'),
+  budgets: JSON.parse(readFileSync('budgets.json', 'utf8')),
+});
+console.log(formatWebBudgetSummary(result).join('\n'));
+process.exit(result.passed ? 0 : 1);
+```
+
+| Export | What it does |
+|---|---|
+| `parseViteManifest(raw)`, `parseViteManifestText(text)`, `readViteManifest(path, deps)` | Read the Vite manifest, type-checking every field it uses and ignoring unknown ones; any problem fails the check. |
+| `buildGraph(manifest, sizeOf, options)`, `staticClosure(chunks, start)` | Static closures, the shell (every `isEntry` chunk, or `shellEntries`), and each route's cold and beyond-shell weight, each file counted once. |
+| `parseWebBudgets(raw)`, `checkBudgets(graph, budgets)`, `matchesPattern(pattern, path)` | Shell, route (`cold`, `beyondShell`) and per-file budgets; an over-budget weight, a stale route or pattern, and an invalid budget all fail. |
+| `findDeadImports(graph, { allow })` | Dynamic imports whose target is already loaded (statically or by the shell) or missing; each allowed one needs a written reason. |
+| `checkWebBudget(input)`, `formatWebBudgetReport(result)`, `formatWebBudgetSummary(result)`, `reportIsFresh(committed, rendered)` | Everything in one call, a deterministic Markdown report to commit, and the freshness check (CRLF equals LF). |
+| `checkPrecompressed(options, deps)`, `formatPrecompressReport(report)` | Every file the server serves compressed (by extension, at least `minBytes`) has a non-empty, fresh sibling per encoding (`br`, `gz`). |
+| `nodeManifestDeps`, `nodeReadText(path)`, `nodeSizeOf(dir, measure)`, `nodePrecompressDeps` | The real I/O; sizes are raw, gzip (default) or brotli bytes. |
+
+The budgets file, the manifest path and the web server paths stay in your repo. Raising a budget
+needs a written reason in a reviewed change: the module never writes the budgets file and has no
+tolerance or override, so there is no way to raise a budget silently.
+
 ## Rule catalog (`catalog`)
 
 `harness catalog` renders a Markdown table of every rule in the registry: id, category, whether it

@@ -99,6 +99,13 @@ port of the in-process Rust runner in `apps/desktop/src-tauri/src/workflow/gaunt
   ignores through `pinned-tools/trivy.ts`). Pure over injected deps; `git.ts` holds the real ones.
   No network call: the caller does the GitHub lookup and passes the result in. Workflows, job
   names, exempt shas and ledger paths are the consumer's, never literals here.
+- `src/web-budget.ts` + `src/web-budget/`: the `@noctcore/harness/web-budget` subpath. The
+  defensive Vite manifest reader (`manifest.ts`), the build graph (`graph.ts`), shell, route and
+  file budgets (`budgets.ts`), dead dynamic imports (`dead-imports.ts`), the report and freshness
+  check (`report.ts`) and the precompress check (`precompress.ts`). Pure over injected deps;
+  `node.ts` holds the real ones (`node:fs`, `node:zlib`). The budgets file, manifest path and
+  server paths are the consumer's. Nothing here writes or raises a budget: do not add a tolerance,
+  override or update helper. `test-support.ts` is a test-only synthetic app (never bundled).
 - `src/index.ts` — the public type barrel (manifest + result shapes) PLUS the portable lint-meta
   contract (`IMetaRule` / `IMetaCtx` / `IViolation`) + the ratchet helpers a generated rule imports.
 

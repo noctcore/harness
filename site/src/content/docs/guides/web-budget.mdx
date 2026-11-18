@@ -1,0 +1,128 @@
+---
+title: Web bundle budgets
+description: Hold a Vite app's shipped bytes to budgets per route, for the shell and per file, catch dynamic imports that save nothing, keep a committed report in step with the build, and check that every file the server serves compressed has its .br and .gz sibling.
+---
+
+import { Code } from '@astrojs/starlight/components';
+import webBudget from '../../../../snippets/scripts/web-budget.mts?raw';
+import webPrecompress from '../../../../snippets/scripts/web-precompress.mts?raw';
+
+`@noctcore/harness/web-budget` reads a Vite build and holds it to the budgets your repo commits:
+
+- **Route budgets**: the cold weight of a route (everything a first visit to it downloads) and the
+  weight it adds **beyond the shell** (what the entry chunks have not already loaded).
+- **Shell and file budgets**: a limit for the shell, and a limit per built file by glob.
+- **Dead dynamic imports**: an `import()` whose target is already loaded, so the split saves
+  nothing, or whose target is not in the build at all.
+- **Report and freshness**: a deterministic Markdown report you commit next to the budgets, and a
+  check that fails when it no longer matches the build.
+- **Precompress**: every file the server should serve compressed has a `.br` and `.gz` sibling,
+  non-empty and no older than the file.
+
+Like every module in the package, the functions are pure over the deps you hand them; the `node*`
+exports are the real file reads, the compressed sizes and the directory walk.
+
+## What stays in your repo
+
+- the **budgets file** (`budgets.json` or any name: you parse it and pass the value in);
+- the **manifest path** (Vite writes `dist/.vite/manifest.json` when `build.manifest` is true);
+- the **web server paths**: the directory your server (nginx, say) serves, its `gzip_min_length` and
+  the encodings it serves precompressed;
+- the script that runs the check and the CI step that calls it.
+
+## Raising a budget
+
+A budget goes up only in a reviewed change that says why: the feature that needs the bytes, in the
+pull request description or in a `$`-prefixed note in the budgets file (`"$why": "..."`; keys
+starting with `$` are ignored). The module never writes the budgets file, and it has no tolerance,
+override flag, environment variable or "update the budgets" helper: there is no way to raise a
+budget silently. A failure message says to shrink what grew first.
+
+## Budgets
+
+<Code code={webBudget.trimEnd()} lang="ts" title="scripts/web-budget.mts" />
+
+A budgets file, all sizes in bytes of the measure you chose (gzip by default):
+
+```json
+{
+  "$why": "settings grew 4 kB for the export dialog, #128",
+  "shell": 180000,
+  "routes": {
+    "src/routes/settings.tsx": { "cold": 260000, "beyondShell": 80000 },
+    "src/routes/editor.tsx": { "beyondShell": 150000 }
+  },
+  "files": [{ "pattern": "assets/*.css", "max": 40000 }]
+}
+```
+
+| Budget | Measures |
+|---|---|
+| `shell` | The static closure of the entry chunks (every `isEntry` chunk, or `shellEntries`): js and css every page loads. |
+| `routes[key].cold` | The static closure of the route's chunk, keyed by its manifest key (the source path Vite keyed it by). |
+| `routes[key].beyondShell` | The same closure minus every file the shell already loads. |
+| `files[].max` | The size of each built file the `pattern` matches (`*` within a segment, `**` across segments). |
+
+A file shared by several chunks is counted once in each closure, and import cycles are safe.
+Referenced assets (images, fonts) are left out unless you pass `includeAssets: true`.
+
+These fail the check, each with a message that says what to do:
+
+- a weight over its budget (with the actual size, the limit and how far over);
+- a **stale budget**: a route key not in the manifest, or a file pattern that matches no built file;
+- a budget value that is zero, negative or not a number, a route with no limit, or an unknown
+  top-level key (`checkWebBudget` throws);
+- a file the manifest names that is not in the build directory.
+
+## Reading the manifest defensively
+
+The manifest shape is Vite's and has changed between majors, so `parseViteManifest` trusts nothing:
+it must be a JSON object, every entry needs a string `file`, and `src`, `name`, `isEntry`,
+`isDynamicEntry`, `imports`, `dynamicImports`, `css` and `assets` are type-checked when present. A
+wrong type, a missing `file`, an empty manifest, a static import of a key the manifest does not
+list, or a path outside the build directory is a named problem, and any problem fails the check.
+Fields it does not know are ignored, so a field a later Vite adds does not break the read. A missing
+manifest file or one that is not JSON is a failure too, never an empty pass. Windows separators in
+keys and paths read as `/`.
+
+## Dead dynamic imports
+
+| Kind | When |
+|---|---|
+| `dead` (`static`) | The importer already loads the target through its static imports. |
+| `dead` (`shell`) | The shell already loads the target. |
+| `broken` (`missing`) | The target is not in the manifest. |
+
+An import that stays on purpose goes in `allowDeadImports` with the importer, the target and a
+written reason. An entry with a blank reason, or one that no longer matches a dead import, fails
+the check, so the list cannot rot.
+
+## The report
+
+`result.report` is Markdown: the shell, each budgeted route (cold, beyond the shell, the limits and
+the headroom), each budgeted file, the dead imports and the failures. Rows are sorted and nothing
+depends on the clock, so the same build gives the same bytes. Commit it next to the budgets, and a
+reviewer sees in the diff what a change added.
+
+`reportIsFresh(committed, rendered, { path, regenerate })` fails when the committed report differs
+from the one just rendered, or is missing, and says which command regenerates it. CRLF and LF line
+endings compare equal, so a Windows checkout is not stale.
+
+## Precompress
+
+<Code code={webPrecompress.trimEnd()} lang="ts" title="scripts/web-precompress.mts" />
+
+| Option | Default | Meaning |
+|---|---|---|
+| `dir` | (required) | The build output directory the server serves. |
+| `extensions` | `.css .html .js .json .mjs .svg .txt .wasm .webmanifest .xml` | Files served compressed. |
+| `minBytes` | `1024` | Smaller files are served plain: match the server's `gzip_min_length`. |
+| `encodings` | `br`, `gz` | The sibling suffixes the server looks for. |
+| `exclude` | none | Built paths never checked, matched exactly. |
+
+A sibling that is missing, empty or older than its file fails. A directory that cannot be read, or
+holds no file to check, fails too: a check that checked nothing is not a pass.
+
+## API
+
+The full signatures are in the [API reference](/harness/reference/api/noctcore/harness/web-budget/).

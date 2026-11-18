@@ -11,7 +11,8 @@
       "@noctcore/harness": ["../../packages/harness/src/index.ts"],
       "@noctcore/harness/rules": ["../../packages/harness/src/rules.ts"],
       "@noctcore/harness/pinned-tools": ["../../packages/harness/src/pinned-tools.ts"],
-      "@noctcore/harness/ci": ["../../packages/harness/src/ci.ts"]
+      "@noctcore/harness/ci": ["../../packages/harness/src/ci.ts"],
+      "@noctcore/harness/web-budget": ["../../packages/harness/src/web-budget.ts"]
     }
   },
   "include": ["entries", "../../packages/harness/src"],
