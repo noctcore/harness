@@ -14,6 +14,10 @@ actionlint release brings new rules and turns a green repo red on nobody's chang
 with a different version installed sees a different verdict than CI. `@noctcore/harness/pinned-tools`
 runs a tool at exactly its pinned version and refuses anything else.
 
+This page covers the workflow linters and gitleaks. hadolint, squawk and trivy run the same way, with
+canaries and a strict read of their configuration: see
+[Dockerfiles, migrations and images](/harness/guides/hadolint-squawk-trivy/).
+
 ## A linter check in a few lines
 
 <Code code={actionlint.trimEnd()} lang="ts" title="scripts/actionlint.mts" />

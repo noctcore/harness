@@ -92,6 +92,10 @@ export default defineConfig({
             { label: 'Baselines and the ratchet', link: '/guides/baselines/' },
             { label: 'The rule catalog', link: '/guides/rule-catalog/' },
             { label: 'Pinned tools', link: '/guides/pinned-tools/' },
+            {
+              label: 'Dockerfiles, migrations and images',
+              link: '/guides/hadolint-squawk-trivy/',
+            },
           ],
         },
         {
