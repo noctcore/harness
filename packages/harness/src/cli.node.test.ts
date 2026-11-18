@@ -18,6 +18,7 @@ const CLI = path.join(DIST, 'cli.js');
 const RULES = path.join(DIST, 'rules.js');
 const PINNED_TOOLS = path.join(DIST, 'pinned-tools.js');
 const CI = path.join(DIST, 'ci.js');
+const WEB_BUDGET = path.join(DIST, 'web-budget.js');
 
 const fixtures: string[] = [];
 
@@ -60,7 +61,13 @@ function runNode(args: string[]): { status: number | null; stdout: string; stder
 beforeAll(() => {
   // Self-sufficient: build the package's own dist if the gate battery hasn't
   // already (CI's test:node runs before any explicit harness build).
-  if (!existsSync(CLI) || !existsSync(RULES) || !existsSync(PINNED_TOOLS)) {
+  if (
+    !existsSync(CLI) ||
+    !existsSync(RULES) ||
+    !existsSync(PINNED_TOOLS) ||
+    !existsSync(CI) ||
+    !existsSync(WEB_BUDGET)
+  ) {
     const build = spawnSync('bun', ['run', 'build'], { cwd: PKG_ROOT, encoding: 'utf8' });
     if (build.status !== 0) {
       throw new Error(`tsup build failed:\n${build.stdout}\n${build.stderr}`);
@@ -282,6 +289,8 @@ describe('the built dist has no network or Bun imports (supply-chain posture)', 
       'pinned-tools.cjs',
       'ci.js',
       'ci.cjs',
+      'web-budget.js',
+      'web-budget.cjs',
     ]
       .map((f) => path.join(DIST, f))
       .filter((p) => existsSync(p));
@@ -330,6 +339,29 @@ process.stdout.write(ci.affectedEnvLines(decision).join(' '));`;
     const res = spawnSync('node', ['--input-type=module', '-e', script], { encoding: 'utf8' });
     expect(res.stderr).toBe('');
     expect(res.stdout).toBe(`TURBO_SCM_BASE=${'a'.repeat(40)} TURBO_AFFECTED=--affected`);
+  });
+});
+
+describe('the web-budget subpath runs under plain node', () => {
+  // A repo budget script imports the subpath by file URL, the way an installed
+  // `@noctcore/harness/web-budget` resolves, and checks a synthetic build.
+  test('imports, weighs a manifest from injected sizes, and fails an over-budget route', () => {
+    const url = pathToFileURL(WEB_BUDGET).href;
+    const script = `import * as wb from ${JSON.stringify(url)};
+const manifest = wb.parseViteManifest({
+  'index.html': { file: 'main.js', isEntry: true, dynamicImports: ['src/a.ts'] },
+  'src/a.ts': { file: 'a.js', isDynamicEntry: true },
+});
+const sizes = { 'main.js': 100, 'a.js': 50 };
+const result = wb.checkWebBudget({
+  manifest,
+  sizeOf: (file) => sizes[file] ?? null,
+  budgets: { shell: 200, routes: { 'src/a.ts': { cold: 40 } } },
+});
+process.stdout.write(result.passed + ' ' + result.violations.map((v) => v.kind + ':' + v.overBy).join(','));`;
+    const res = spawnSync('node', ['--input-type=module', '-e', script], { encoding: 'utf8' });
+    expect(res.stderr).toBe('');
+    expect(res.stdout).toBe('false route-cold:10');
   });
 });
 
