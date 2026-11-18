@@ -1,5 +1,31 @@
 # @noctcore/harness
 
+## 0.8.0
+
+### Minor Changes
+
+- [#21](https://github.com/noctcore/harness/pull/21) [`ce36f56`](https://github.com/noctcore/harness/commit/ce36f56e276db8e5add345dfbbdb2cae3f574cab) Thanks [@Shironex](https://github.com/Shironex)! - Add the `@noctcore/harness/ci` subpath: three CI helpers as pure functions over injected git and GitHub lookups.
+  
+  - `decideAffectedBase(input, deps, options)` (with `chooseBase` and `affectedBaseFrom`) picks the commit a run diffs against: a pull request's base, or on push the head of the last successful push run when it is an ancestor of HEAD. Every doubt is a full run, including a change outside a workspace under `workspaceRoots` (`apps` and `packages` by default). `headShaOfLatestRun` parses the GitHub list-workflow-runs response your repo fetches, and `affectedEnvLines` writes the `GITHUB_ENV` lines (`TURBO_SCM_BASE` and `TURBO_AFFECTED` by default).
+  - `commitRange` decides which commits a run lints, and `runCommitlint` lints them with the commitlint command you pass, skipping exempt commits listed by full sha with a reason and their recorded message (`lintPlan`, `exemptionsFor`, `exemptionProblems`). A pull request never uses the exemption list.
+  - `collectDueEntries`, `dueReport` and `formatDueReport` list dated ledger entries (`reviewBy` by default) and trivy `expired_at` dates due within 14 days and fail on those within 7, for a scheduled job whose wiring stays in your repo.
+  - `nodeCiGitDeps`, `nodeIsWorkspace`, `nodeSpawnInherit` and `readDueSources` are the real I/O.
+  
+  Nothing that already shipped changes behavior.
+
+- [#25](https://github.com/noctcore/harness/pull/25) [`aa097ff`](https://github.com/noctcore/harness/commit/aa097ff619d03023ee2f4d9f79faab972f8af081) Thanks [@Shironex](https://github.com/Shironex)! - Add the `@noctcore/harness/web-budget` subpath: web bundle budgets for a Vite build, as pure functions over injected file reads.
+  
+  - `parseManifest` reads the Vite manifest defensively into a graph of script chunks: text that is not JSON, an entry without a `file`, a wrong field type, a path outside the build directory, a reference to an unlisted key and a manifest with no script chunk all throw; unknown fields are ignored.
+  - `loadWebBuild` refuses a missing build, a missing manifest, a build older than its `sourceRoots` (skippable under CI) and a directory two builds wrote into, then weighs each file as served.
+  - `checkRoutes` holds each route's cold weight (its shell plus the route) and its weight beyond the shell to baselines, with named shells for layout routes.
+  - `parseFileBudgets` and `checkFileBudgets` hold file patterns and a route's own chunks (`ownChunks`, taken from the graph) to `"<n> kB"` limits; a pattern or route that names nothing fails.
+  - `checkDynamicImports` reports `import()` calls that split nothing (`same-chunk`, `static`, `entry`, `loaded-with`), and fails a build that lists none unless told the app splits nothing.
+  - `parseServedEncoding` and `servedSize` weigh a file the way an nginx configuration sends it (gzip level, length floor, types, `gzip_proxied`, `brotli_static`), failing closed on anything the model cannot read; includes and `types` locations it may accept are options.
+  - `precompressDir` writes the `.br` copies `brotli_static` serves (old copies removed first), and `checkPrecompressed` checks them.
+  - `runBudget` and `headroomFromArgv` run a budget script with prefixed output and an exit code; headroom only prints limits.
+  
+  Nothing in the module writes or raises a limit, and it has no tolerance or override. Nothing that already shipped changes behavior.
+
 ## 0.7.0
 
 ### Minor Changes
