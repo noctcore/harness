@@ -1,6 +1,6 @@
 {
   "name": "@noctcore/harness-mutation",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "sideEffects": false,
   "description": "A mutation-testing gate over Stryker: a score ratchet, changed-line runs, a reviewed ledger of accepted mutants and a fail-closed verdict. Library functions over injectable Node I/O.",
