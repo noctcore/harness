@@ -1,0 +1,4 @@
+[test]
+# `bun run test:coverage` fails when any source file is below these floors.
+coverageThreshold = { lines = 0.87, functions = 0.83 }
+coverageSkipTestFiles = true

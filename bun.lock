@@ -35,6 +35,22 @@
         "typescript": "^6.0.3",
       },
     },
+    "packages/harness-mutation": {
+      "name": "@noctcore/harness-mutation",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@types/bun": "^1.1.0",
+        "@types/node": "^22.0.0",
+        "tsup": "^9.0.0",
+        "typescript": "^6.0.3",
+      },
+      "peerDependencies": {
+        "@stryker-mutator/core": "^10.0.0",
+      },
+      "optionalPeers": [
+        "@stryker-mutator/core",
+      ],
+    },
     "site": {
       "name": "@noctcore/harness-docs",
       "version": "0.0.0",
@@ -407,6 +423,8 @@
     "@noctcore/harness": ["@noctcore/harness@workspace:packages/harness"],
 
     "@noctcore/harness-docs": ["@noctcore/harness-docs@workspace:site"],
+
+    "@noctcore/harness-mutation": ["@noctcore/harness-mutation@workspace:packages/harness-mutation"],
 
     "@oslojs/encoding": ["@oslojs/encoding@1.1.0", "", {}, "sha512-70wQhgYmndg4GCPxPPxPGevRKqTIJ2Nh4OkiMWmDAVYsTQ+Ta7Sq+rPevXyXGdzr30/qZBnyOalCszoMxlyldQ=="],
 

@@ -1,0 +1,63 @@
+{
+  "name": "@noctcore/harness-mutation",
+  "version": "0.0.0",
+  "type": "module",
+  "sideEffects": false,
+  "description": "A mutation-testing gate over Stryker: a score ratchet, changed-line runs, a reviewed ledger of accepted mutants and a fail-closed verdict. Library functions over injectable Node I/O.",
+  "license": "MIT",
+  "homepage": "https://github.com/noctcore/harness/tree/main/packages/harness-mutation#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/noctcore/harness.git",
+    "directory": "packages/harness-mutation"
+  },
+  "bugs": {
+    "url": "https://github.com/noctcore/harness/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "prepack": "npm run build",
+    "check-types": "tsc --noEmit",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage"
+  },
+  "peerDependencies": {
+    "@stryker-mutator/core": "^10.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@stryker-mutator/core": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.0",
+    "@types/node": "^22.0.0",
+    "tsup": "^9.0.0",
+    "typescript": "^6.0.3"
+  }
+}
