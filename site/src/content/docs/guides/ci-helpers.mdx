@@ -1,0 +1,124 @@
+---
+title: CI helpers
+description: Decide the base commit a CI run diffs against, lint every commit since the last green run with an exemption list for history that cannot be rewritten, and fail a scheduled job before a dated exception lapses.
+---
+
+import { Code } from '@astrojs/starlight/components';
+import affectedBase from '../../../../snippets/scripts/ci-affected-base.mts?raw';
+import commitlint from '../../../../snippets/scripts/ci-commitlint.mts?raw';
+import dueDates from '../../../../snippets/scripts/ci-due-dates.mts?raw';
+
+`@noctcore/harness/ci` holds three small decisions a CI pipeline makes around its checks:
+
+- **Affected base**: which commit a run compares against, so a workspace filter (turbo
+  `--affected`, an Nx base) skips only what a completed run already proved green.
+- **Commitlint range**: which commits a run lints, so a `--no-verify` commit cannot slip through,
+  with an exemption list by sha for commits already on a protected branch.
+- **Due dates**: which dated exceptions (ledger entries with a review date, trivy ignores with an
+  `expired_at`) are about to lapse, for a scheduled job that goes red ahead of the date.
+
+Like every module in the package, the functions are pure over the deps you hand them. Git runs
+through `nodeCiGitDeps(cwd)`, and the GitHub lookup is a function your repo writes: the package
+makes no network call.
+
+## What stays in your repo
+
+The package decides; your repo wires. These stay with you:
+
+- the workflow files, the job names and the step that writes `GITHUB_ENV`;
+- the call to the GitHub API for the last successful push run (`headShaOfLatestRun` parses the
+  response);
+- the exempt commit list for commitlint;
+- the ledger files and their paths;
+- the **scheduled due-date job**. A due date turns red on a calendar day, not on a commit, so only a
+  scheduled workflow (`on: schedule`) catches it, and that workflow's trigger and wiring must stay
+  in your repo. The package ships no workflow.
+
+## Affected base
+
+<Code code={affectedBase.trimEnd()} lang="ts" title="scripts/ci-affected-base.mts" />
+
+`chooseBase` picks a candidate, and `affectedBaseFrom` keeps it only when the diff is safe to filter
+(`decideAffectedBase` does both):
+
+| Event | Base | Full run when |
+|---|---|---|
+| `pull_request` | The pull request's base sha. | The base sha is not a full sha. |
+| `push` | The head of the **last successful push run** of the workflow on the branch, never the previous tip. | The lookup throws, there is no green run yet, or the green sha is not an ancestor of HEAD (a force push). |
+| anything else | None. | Always. |
+
+Then, for a candidate base, a full run also follows when git cannot list the diff, or when a changed
+path is outside a real workspace: a direct child of a workspace root (`apps` and `packages` by
+default, `workspaceRoots` to change them) that has a `package.json`. A root config, the lockfile or a
+stray folder is invisible to a workspace filter, so it runs everything. The reason names the first
+five such paths.
+
+Why not the previous tip? Push A then push B while A's run is pending replaces A's run, and a base
+of A would test only A..B: A's changes never got a completed run. A failed, cancelled or replaced
+run is not a success, so the next run falls back to the last green one.
+
+`affectedEnvLines(decision)` returns the `GITHUB_ENV` lines: `TURBO_SCM_BASE=<sha>` and
+`TURBO_AFFECTED=--affected`, or both empty on a full run. Pass `baseVar`, `flagVar` and `flagValue`
+for another tool.
+
+## Commitlint range
+
+`commitRange(input, chosen, isAncestor)` takes the base `chooseBase` picked (before the diff check,
+since a full run still has a proven base for commits):
+
+- `pull_request`: base sha to head sha, never the synthetic merge commit; the merge commit's
+  parents (`HEAD^1..HEAD^2`) when the shas cannot be read.
+- `push`: the green base to HEAD, so a push whose run failed is read again by the next one; without
+  one, the pushed range from `before` when it is a real ancestor; otherwise HEAD alone.
+- anything else: HEAD alone.
+
+<Code code={commitlint.trimEnd()} lang="ts" title="scripts/ci-commitlint.mts" />
+
+commitlint is not a dependency of the package: you pass its command and config arguments.
+`runCommitlint` prints each command before it runs it and returns the exit code:
+
+| Exit | When |
+|---|---|
+| `0` | Every linted commit passed, or the range holds no commit (a rerun of the last green head). |
+| `1` | git cannot list the range (fetch the full history with `fetch-depth: 0`), a commit fails, or the exemption list is refused. |
+
+### Exempt commits
+
+A commit already on a protected branch that fails your config (a `--no-verify` commit, a merge
+message typed in a web UI) would keep every push red, and the branch cannot be force-pushed. List it
+by full sha with a reason and its message exactly as `git log -1 --format=%B <sha>` prints it:
+
+- a listed commit in range is skipped, and every other commit is linted one by one;
+- its message must still match the recorded one, so the list cannot hide a different commit;
+- a malformed list (a short sha, a blank reason or message, a sha listed twice) refuses the run;
+- a pull request never uses the list: a commit already on the base branch is never in its range,
+  and a pull request must not exempt its own commits.
+
+## Due dates
+
+<Code code={dueDates.trimEnd()} lang="ts" title="scripts/ci-due-dates.mts" />
+
+```
+soon  2026-11-30  12 days left          overrides.ledger.json  lodash
+due-dates: passed (9 dated entries, 1 due within 14 days, none due within 7 days or lapsed)
+```
+
+A ledger is a JSON object whose entries each carry a date (`reviewBy` by default, `dateField` to
+change it); top-level keys starting with `$` are metadata. A trivy ignore file is read with the same
+strict reader as the trivy check, and each `expired_at` is a due date.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `dateField` | `reviewBy` | The entry field that holds the date (YYYY-MM-DD, UTC). |
+| `listDays` | `14` | Entries due within this many days are listed. |
+| `failDays` | `7` | An entry due within this many days, or lapsed, fails the run. `-1` fails only lapsed entries. |
+| `skipKeyPrefix` | `$` | Top-level keys with this prefix are not entries. |
+| `label` | `due-dates` | The name the summary line starts with. |
+
+An entry without a readable date, a ledger that is not a JSON object and a ledger that is missing
+are failures, never passes: an undated exception never ends. The failing summary says what to do:
+renew or remove the entries, and date every entry.
+
+## API
+
+The full signatures are in the [API reference](/harness/reference/api/noctcore/harness/ci/).
